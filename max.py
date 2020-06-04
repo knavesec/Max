@@ -40,6 +40,7 @@ def get_info(args):
         "comps" : "MATCH (n:Computer) RETURN n.name",
         "das" : "MATCH p =(n:User)-[r:MemberOf*1..]->(g:Group) WHERE g.name=~'DOMAIN ADMINS@.*' RETURN n.name",
         "unconstrained" : "MATCH (n) WHERE n.unconstraineddelegation=TRUE RETURN n.name",
+        "nopreauth" : "MATCH (n:User) WHERE n.dontreqpreauth=TRUE RETURN n.name",
         "local-admin" : "MATCH p=shortestPath((m:User {{name:\"{uname}\"}})-[r:AdminTo|MemberOf*1..]->(n:Computer)) RETURN n.name",
         "adminsOf" : "MATCH p=shortestPath((m:Computer {{name:\"{comp}\"}})<-[r:AdminTo|MemberOf*1..]-(n:User)) RETURN n.name",
         "owned" : "MATCH (n) WHERE n.owned=true RETURN n.name",
@@ -56,6 +57,8 @@ def get_info(args):
         query = queries["das"]
     elif (args.unconstrained):
         query = queries["unconstrained"]
+    elif (args.nopreauth):
+        query = queries["nopreauth"]
     elif (args.owned):
         query = queries["owned"]
     elif (args.hvt):
@@ -143,6 +146,7 @@ def main():
     getinfo_switch.add_argument("--comps",dest="comps",default=False,action="store_true",help="Return a list of all domain computers")
     getinfo_switch.add_argument("--das",dest="das",default=False,action="store_true",help="Return a list of all Domain Admins")
     getinfo_switch.add_argument("--unconst",dest="unconstrained",default=False,action="store_true",help="Return a list of all objects configured with Unconstrained Delegation")
+    getinfo_switch.add_argument("--npusers",dest="nopreauth",default=False,action="store_true",help="Return a list of all users that don't require Kerberos Pre-Auth (AS-REP roastable)")
     getinfo_switch.add_argument("--adminto",dest="uname",default="",help="Return a list of computers that UNAME is a local administrator to")
     getinfo_switch.add_argument("--adminsof",dest="comp",default="",help="Return a list of users that are administrators to COMP")
     getinfo_switch.add_argument("--owned",dest="owned",default=False,action="store_true",help="Return all objects that are marked as owned")
