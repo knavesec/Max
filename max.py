@@ -63,8 +63,8 @@ def get_info(args):
         query = queries["owned"]
     elif (args.hvt):
         query = queries["hvt"]
-    # elif (args.desc):
-    #     query = queries["desc"]
+    elif (args.desc):
+        query = queries["desc"]
     elif (args.uname != ""):
         query = queries["local-admin"].format(uname=args.uname.upper().strip())
     elif (args.comp != ""):
@@ -74,40 +74,51 @@ def get_info(args):
     x = json.loads(r.text)
     entry_list = x["results"][0]["data"]
 
-    # if (args.desc):
-    #     pass
-    # else:
-    for value in entry_list:
-        print(value["row"][0])
+    if (args.desc):
+        for value in entry_list:
+            print(value["row"][0] + " - " + value["row"][1])
+    else:
+        for value in entry_list:
+            print(value["row"][0])
 
 
 def mark_owned(args):
 
-    f = open(args.filename).readlines()
+    if (args.clear):
 
-    note_string = ""
-    if args.notes != "":
-        note_string = "SET n.notes=\"" + args.notes + "\""
+        query = 'MATCH (n) WHERE n.owned=true SET n.owned=false'
+        r = do_query(args,query)
 
-    for line in f:
+        print("'Owned' attribute removed from all objects.")
 
-        query = 'MATCH (n) WHERE n.name="{uname}" SET n.owned=true {notes} RETURN n'.format(uname=line.upper().strip(),notes=note_string)
-        r = do_query(args, query)
+    else:
 
-        fail_resp = '{"results":[{"columns":["n"],"data":[]}],"errors":[]}'
-        if r.text == fail_resp:
-            print("[-] AD Object: " + line.upper().strip() + " could not be marked as owned")
-        else:
-            print("[+] AD Object: " + line.upper().strip() + " marked as owned successfully")
+        note_string = ""
+        if args.notes != "":
+            note_string = "SET n.notes=\"" + args.notes + "\""
+
+        f = open(args.filename).readlines()
+
+        for line in f:
+
+            query = 'MATCH (n) WHERE n.name="{uname}" SET n.owned=true {notes} RETURN n'.format(uname=line.upper().strip(),notes=note_string)
+            r = do_query(args, query)
+
+            fail_resp = '{"results":[{"columns":["n"],"data":[]}],"errors":[]}'
+            if r.text == fail_resp:
+                print("[-] AD Object: " + line.upper().strip() + " could not be marked as owned")
+            else:
+                print("[+] AD Object: " + line.upper().strip() + " marked as owned successfully")
 
 
 def mark_hvt(args):
 
-    f = open(args.filename).readlines()
 
     note_string = ""
     if args.notes != "":
         note_string = "SET n.notes=\"" + args.notes + "\""
+
+    f = open(args.filename).readlines()
 
     for line in f:
 
@@ -139,8 +150,9 @@ def main():
     markowned = switch.add_parser("mark-owned",help="Mark objects as owned")
     markhvt = switch.add_parser("mark-hvt",help="Mark items as High Value Targets (HVTs)")
 
-
     # GETINFO function parameters
+    getinfo.add_argument("--get-note",dest="getnote",default=False,action="store_true",help="Return the \"notes\" attribute for whatever objects are returned")
+
     getinfo_switch = getinfo.add_mutually_exclusive_group(required=True)
     getinfo_switch.add_argument("--users",dest="users",default=False,action="store_true",help="Return a list of all domain users")
     getinfo_switch.add_argument("--comps",dest="comps",default=False,action="store_true",help="Return a list of all domain computers")
@@ -151,15 +163,16 @@ def main():
     getinfo_switch.add_argument("--adminsof",dest="comp",default="",help="Return a list of users that are administrators to COMP")
     getinfo_switch.add_argument("--owned",dest="owned",default=False,action="store_true",help="Return all objects that are marked as owned")
     getinfo_switch.add_argument("--hvt",dest="hvt",default=False,action="store_true",help="Return all objects that are marked as High Value Targets")
-#    getinfo_switch.add_argument("--desc",dest="desc",default=False,action="store_true",help="Return all users with the description field populated (also returns description)")
+    getinfo_switch.add_argument("--desc",dest="desc",default=False,action="store_true",help="Return all users with the description field populated (also returns description)")
 
     # MARKOWNED function paramters
+    markowned.add_argument("-f","--file",dest="filename",default="",required=False,help="Filename containing AD objects (must have FQDN attached)")
     markowned.add_argument("--add-note",dest="notes",default="",help="Notes to add to all marked objects (method of compromise)")
-    markowned.add_argument("filename",help="Filename containing AD objects (must have FQDN attached)")
+    markowned.add_argument("--clear",dest="clear",action="store_true",help="Removed owned marker from all objects")
 
     # MARKHVT function parameters
+    markhvt.add_argument("-f","--file",dest="filename",default="",required=False,help="Filename containing AD objects (must have FQDN attached)")
     markhvt.add_argument("--add-note",dest="notes",default="",help="Notes to add to all marked objects (reason for HVT status)")
-    markhvt.add_argument("filename",help="Filename containing AD objects (must have FQDN attached)")
 
     args = parser.parse_args()
 
@@ -171,7 +184,7 @@ def main():
     elif args.command == "mark-hvt":
         mark_hvt(args)
     else:
-        print "Error"
+        print("Error")
 
 
 
