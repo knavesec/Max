@@ -1,15 +1,36 @@
-# Max: a good boy
+# Maximizing BloodHound with a simple suite of tools
 
-## Maximizing BloodHound with a simple suite of tools
-
-### Description
+## Description
 
 A simple suite of tools:
 - Pull lists of information from the Neo4j database
 - Mark a list of objects as Owned
 - Mark a list of objects as High Value Targets
 
-### Usage
+## Usage
+
+#### Basics
+
+```
+python3 max.py -h
+usage: max.py [-h] [-u USERNAME] [-p PASSWORD] [--url URL] {get-info,mark-owned,mark-hvt} ...
+
+Maximizing Bloodhound. Max is a good boy.
+
+positional arguments:
+  {get-info,mark-owned,mark-hvt}
+    get-info            Get info for users, computers, etc
+    mark-owned          Mark objects as Owned
+    mark-hvt            Mark items as High Value Targets (HVTs)
+
+optional arguments:
+  -h, --help            show this help message and exit
+
+Main Arguments:
+  -u USERNAME           Neo4j database username (Default: neo4j)
+  -p PASSWORD           Neo4j database password (Default: bloodhound)
+  --url URL             Neo4j database URL (Default: http://127.0.0.1:7474)
+```
 
 #### Neo4j Database
 
