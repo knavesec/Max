@@ -36,50 +36,95 @@ def get_info(args):
 
     # key : {query: "", columns: []}
     queries = {
-        "users" : "MATCH (n:User) RETURN n.name",
-        "comps" : "MATCH (n:Computer) RETURN n.name",
-        "das" : "MATCH p =(n:User)-[r:MemberOf*1..]->(g:Group) WHERE g.name=~'DOMAIN ADMINS@.*' RETURN n.name",
-        "unconstrained" : "MATCH (n) WHERE n.unconstraineddelegation=TRUE RETURN n.name",
-        "nopreauth" : "MATCH (n:User) WHERE n.dontreqpreauth=TRUE RETURN n.name",
-        "local-admin" : "MATCH p=shortestPath((m:User {{name:\"{uname}\"}})-[r:AdminTo|MemberOf*1..]->(n:Computer)) RETURN n.name",
-        "adminsOf" : "MATCH p=shortestPath((m:Computer {{name:\"{comp}\"}})<-[r:AdminTo|MemberOf*1..]-(n:User)) RETURN n.name",
-        "owned" : "MATCH (n) WHERE n.owned=true RETURN n.name",
-        "hvt" : "MATCH (n) WHERE n.highvalue=true RETURN n.name",
-        "desc" : "MATCH (n:User) WHERE n.description IS NOT NULL RETURN n.name,n.description"
+        "users" : {
+            "query": "MATCH (n:User) RETURN n.name",
+            "columns" : ["UserName"]
+            },
+        "comps" : {
+            "query": "MATCH (n:Computer) RETURN n.name",
+            "columns" : ["ComputerName"]
+            },
+        "das" : {
+            "query": "MATCH p =(n:User)-[r:MemberOf*1..]->(g:Group) WHERE g.name=~'DOMAIN ADMINS@.*' RETURN n.name",
+            "columns" : ["Username"]
+            },
+        "unconstrained" : {
+            "query": "MATCH (n) WHERE n.unconstraineddelegation=TRUE RETURN n.name",
+            "columns" : ["ObjectName"]
+            },
+        "nopreauth" : {
+            "query": "MATCH (n:User) WHERE n.dontreqpreauth=TRUE RETURN n.name",
+            "columns" : ["UserName"]
+            },
+        "localadmin" : {
+            "query": "MATCH p=shortestPath((m:User {{name:\"{uname}\"}})-[r:AdminTo|MemberOf*1..]->(n:Computer)) RETURN n.name",
+            "columns" : ["ComputeryName"]
+            },
+        "adminsof" : {
+            "query": "MATCH p=shortestPath((m:Computer {{name:\"{comp}\"}})<-[r:AdminTo|MemberOf*1..]-(n:User)) RETURN n.name",
+            "columns" : ["UserName"]
+            },
+        "owned" : {
+            "query": "MATCH (n) WHERE n.owned=true RETURN n.name",
+            "columns" : ["ObjectName"]
+            },
+        "hvt" : {
+            "query": "MATCH (n) WHERE n.highvalue=true RETURN n.name",
+            "columns" : ["ObjectName"]
+            },
+        "desc" : {
+            "query": "MATCH (n:User) WHERE n.description IS NOT NULL RETURN n.name,n.description",
+            "columns" : ["UserName","Description"]
+            },
+        "admincomps" : {
+            "query": "MATCH (n:Computer),(m:Computer) MATCH (n)-[r:MemberOf|AdminTo*1..]->(m) return n.name,m.name",
+            "columns" : ["AdminCompName","CompName"]
+            }
     }
 
     query = ""
+    cols = []
     if (args.users):
-        query = queries["users"]
+        query = queries["users"]["query"]
+        cols = queries["users"]["columns"]
     elif (args.comps):
-        query = queries["comps"]
+        query = queries["comps"]["query"]
+        cols = queries["comps"]["columns"]
     elif (args.das):
-        query = queries["das"]
+        query = queries["das"]["query"]
+        cols = queries["das"]["columns"]
     elif (args.unconstrained):
-        query = queries["unconstrained"]
+        query = queries["unconstrained"]["query"]
+        cols = queries["unconstrained"]["columns"]
     elif (args.nopreauth):
-        query = queries["nopreauth"]
+        query = queries["nopreauth"]["query"]
+        cols = queries["nopreauth"]["columns"]
     elif (args.owned):
-        query = queries["owned"]
+        query = queries["owned"]["query"]
+        cols = queries["owned"]["columns"]
     elif (args.hvt):
-        query = queries["hvt"]
+        query = queries["hvt"]["query"]
+        cols = queries["hvt"]["columns"]
     elif (args.desc):
-        query = queries["desc"]
+        query = queries["desc"]["query"]
+        cols = queries["desc"]["columns"]
+    elif (args.admincomps):
+        query = queries["admincomps"]["query"]
+        cols = queries["admincomps"]["columns"]
     elif (args.uname != ""):
-        query = queries["local-admin"].format(uname=args.uname.upper().strip())
+        query = queries["localadmin"]["query"].format(uname=args.uname.upper().strip())
+        cols = queries["localadmin"]["columns"]
     elif (args.comp != ""):
-        query = queries["adminsOf"].format(comp=args.comp.upper().strip())
+        query = queries["adminsof"]["query"].format(comp=args.comp.upper().strip())
+        cols = queries["adminsof"]["columns"]
 
     r = do_query(args, query)
     x = json.loads(r.text)
     entry_list = x["results"][0]["data"]
 
-    if (args.desc):
-        for value in entry_list:
-            print(value["row"][0] + " - " + value["row"][1])
-    else:
-        for value in entry_list:
-            print(value["row"][0])
+    print(" - ".join(cols))
+    for value in entry_list:
+        print(" - ".join(value["row"]))
 
 
 def mark_owned(args):
@@ -88,7 +133,6 @@ def mark_owned(args):
 
         query = 'MATCH (n) WHERE n.owned=true SET n.owned=false'
         r = do_query(args,query)
-
         print("'Owned' attribute removed from all objects.")
 
     else:
@@ -147,7 +191,7 @@ def main():
     # three options for the function
     switch = parser.add_subparsers(dest='command')
     getinfo = switch.add_parser("get-info",help="Get info for users, computers, etc")
-    markowned = switch.add_parser("mark-owned",help="Mark objects as owned")
+    markowned = switch.add_parser("mark-owned",help="Mark objects as Owned")
     markhvt = switch.add_parser("mark-hvt",help="Mark items as High Value Targets (HVTs)")
 
     # GETINFO function parameters
@@ -164,6 +208,7 @@ def main():
     getinfo_switch.add_argument("--owned",dest="owned",default=False,action="store_true",help="Return all objects that are marked as owned")
     getinfo_switch.add_argument("--hvt",dest="hvt",default=False,action="store_true",help="Return all objects that are marked as High Value Targets")
     getinfo_switch.add_argument("--desc",dest="desc",default=False,action="store_true",help="Return all users with the description field populated (also returns description)")
+    getinfo_switch.add_argument("--admincomps",dest="admincomps",default=False,action="store_true",help="Return all computers with admin privileges to another computer [Comp1-AdminTo->Comp2]")
 
     # MARKOWNED function paramters
     markowned.add_argument("-f","--file",dest="filename",default="",required=False,help="Filename containing AD objects (must have FQDN attached)")
@@ -184,7 +229,7 @@ def main():
     elif args.command == "mark-hvt":
         mark_hvt(args)
     else:
-        print("Error")
+        print("Error: use a module or use -h/--help to see help")
 
 
 
