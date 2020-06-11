@@ -33,7 +33,6 @@ def do_query(args, query):
 
 def get_info(args):
 
-
     # key : {query: "", columns: []}
     queries = {
         "users" : {
@@ -50,7 +49,7 @@ def get_info(args):
             },
         "das" : {
             "query": "MATCH p =(n:User)-[r:MemberOf*1..]->(g:Group) WHERE g.name=~'DOMAIN ADMINS@.*' RETURN n.name",
-            "columns" : ["Username"]
+            "columns" : ["UserName"]
             },
         "unconstrained" : {
             "query": "MATCH (n) WHERE n.unconstraineddelegation=TRUE RETURN n.name",
@@ -62,7 +61,7 @@ def get_info(args):
             },
         "localadmin" : {
             "query": "MATCH p=shortestPath((m:User {{name:\"{uname}\"}})-[r:AdminTo|MemberOf*1..]->(n:Computer)) RETURN n.name",
-            "columns" : ["ComputeryName"]
+            "columns" : ["ComputerName"]
             },
         "adminsof" : {
             "query": "MATCH p=shortestPath((m:Computer {{name:\"{comp}\"}})<-[r:AdminTo|MemberOf*1..]-(n:User)) RETURN n.name",
@@ -129,9 +128,13 @@ def get_info(args):
     x = json.loads(r.text)
     entry_list = x["results"][0]["data"]
 
-    print(" - ".join(cols))
+    if not args.quiet:
+        print(" - ".join(cols))
     for value in entry_list:
-        print(" - ".join(value["row"]))
+        try:
+            print(" - ".join(value["row"]))
+        except:
+            pass
 
 
 def mark_owned(args):
@@ -156,10 +159,11 @@ def mark_owned(args):
             r = do_query(args, query)
 
             fail_resp = '{"results":[{"columns":["n"],"data":[]}],"errors":[]}'
-            if r.text == fail_resp:
-                print("[-] AD Object: " + line.upper().strip() + " could not be marked as owned")
-            else:
-                print("[+] AD Object: " + line.upper().strip() + " marked as owned successfully")
+            if not args.quiet:
+                if r.text == fail_resp:
+                    print("[-] AD Object: " + line.upper().strip() + " could not be marked as owned")
+                else:
+                    print("[+] AD Object: " + line.upper().strip() + " marked as owned successfully")
 
 
 def mark_hvt(args):
@@ -177,10 +181,11 @@ def mark_hvt(args):
         r = do_query(args, query)
 
         fail_resp = '{"results":[{"columns":["n"],"data":[]}],"errors":[]}'
-        if r.text == fail_resp:
-            print("[-] AD Object: " + line.upper().strip() + " could not be marked as HVT")
-        else:
-            print("[+] AD Object: " + line.upper().strip() + " marked as HVT successfully")
+        if not args.quiet:
+            if r.text == fail_resp:
+                print("[-] AD Object: " + line.upper().strip() + " could not be marked as HVT")
+            else:
+                print("[+] AD Object: " + line.upper().strip() + " marked as HVT successfully")
 
 
 
@@ -202,8 +207,6 @@ def main():
     markhvt = switch.add_parser("mark-hvt",help="Mark items as High Value Targets (HVTs)")
 
     # GETINFO function parameters
-    getinfo.add_argument("--get-note",dest="getnote",default=False,action="store_true",help="Return the \"notes\" attribute for whatever objects are returned")
-
     getinfo_switch = getinfo.add_mutually_exclusive_group(required=True)
     getinfo_switch.add_argument("--users",dest="users",default=False,action="store_true",help="Return a list of all domain users")
     getinfo_switch.add_argument("--comps",dest="comps",default=False,action="store_true",help="Return a list of all domain computers")
@@ -217,6 +220,9 @@ def main():
     getinfo_switch.add_argument("--hvt",dest="hvt",default=False,action="store_true",help="Return all objects that are marked as High Value Targets")
     getinfo_switch.add_argument("--desc",dest="desc",default=False,action="store_true",help="Return all users with the description field populated (also returns description)")
     getinfo_switch.add_argument("--admincomps",dest="admincomps",default=False,action="store_true",help="Return all computers with admin privileges to another computer [Comp1-AdminTo->Comp2]")
+
+    getinfo.add_argument("--get-note",dest="getnote",default=False,action="store_true",help="Return the \"notes\" attribute for whatever objects are returned")
+    getinfo.add_argument("-q",dest="quiet",action="store_true",default=False,help="Quiet mode, suppress column headers from output")
 
     # MARKOWNED function paramters
     markowned.add_argument("-f","--file",dest="filename",default="",required=False,help="Filename containing AD objects (must have FQDN attached)")

@@ -9,6 +9,29 @@ A simple suite of tools:
 
 ## Usage
 
+#### Quick Use
+
+Importing owned objects into BH
+```
+python3 max.py mark-owned -f owned.txt
+python3 max.py mark-owned -f owned.txt --add-note "Owned by repeated local admin"
+```
+
+Get list of users (apply quiet -q to remove "Username" label)
+```
+python3 max.py get-info --users
+
+UserName
+USER01@DOMAIN.LOCAL
+USER02@DOMAIN.LOCAL
+...
+```
+
+Get a list of computers that a user has administrative rights to
+```
+python3 max.py get-info --adminto USER01@DOMAIN.LOCAL
+```
+
 #### Basics
 
 ```
