@@ -44,6 +44,10 @@ def get_info(args):
             "query": "MATCH (n:Computer) RETURN n.name",
             "columns" : ["ComputerName"]
             },
+        "groups" : {
+            "query": "MATCH (n:Group) RETURN n.name",
+            "columns" : ["GroupName"]
+            },
         "das" : {
             "query": "MATCH p =(n:User)-[r:MemberOf*1..]->(g:Group) WHERE g.name=~'DOMAIN ADMINS@.*' RETURN n.name",
             "columns" : ["Username"]
@@ -90,6 +94,9 @@ def get_info(args):
     elif (args.comps):
         query = queries["comps"]["query"]
         cols = queries["comps"]["columns"]
+    elif (args.groups):
+        query = queries["groups"]["query"]
+        cols = queries["groups"]["columns"]
     elif (args.das):
         query = queries["das"]["query"]
         cols = queries["das"]["columns"]
@@ -200,6 +207,7 @@ def main():
     getinfo_switch = getinfo.add_mutually_exclusive_group(required=True)
     getinfo_switch.add_argument("--users",dest="users",default=False,action="store_true",help="Return a list of all domain users")
     getinfo_switch.add_argument("--comps",dest="comps",default=False,action="store_true",help="Return a list of all domain computers")
+    getinfo_switch.add_argument("--groups",dest="groups",default=False,action="store_true",help="Return a list of all domain groups")
     getinfo_switch.add_argument("--das",dest="das",default=False,action="store_true",help="Return a list of all Domain Admins")
     getinfo_switch.add_argument("--unconst",dest="unconstrained",default=False,action="store_true",help="Return a list of all objects configured with Unconstrained Delegation")
     getinfo_switch.add_argument("--npusers",dest="nopreauth",default=False,action="store_true",help="Return a list of all users that don't require Kerberos Pre-Auth (AS-REP roastable)")
