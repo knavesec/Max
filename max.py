@@ -13,15 +13,6 @@ global_username = "neo4j"
 global_password = "bloodhound"
 
 
-def test_url(url):
-
-        data = {"statements":[{"statement":query}]}
-        headers = {'Content-type': 'application/json', 'Accept': 'application/json; charset=UTF-8'}
-        auth = HTTPBasicAuth(args.username, args.password)
-
-        return requests.post(args.url + global_uri, auth=auth, headers=headers, json=data)
-
-
 def do_query(args, query):
 
         data = {"statements":[{"statement":query}]}
