@@ -32,6 +32,11 @@ Get a list of computers that a user has administrative rights to
 python3 max.py get-info --adminto USER01@DOMAIN.LOCAL
 ```
 
+Get a list of owned objects with the notes for each
+```
+python3 max.py get-info --owned --get-note
+```
+
 #### Basics
 
 ```

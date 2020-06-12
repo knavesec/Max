@@ -124,6 +124,10 @@ def get_info(args):
         query = queries["adminsof"]["query"].format(comp=args.comp.upper().strip())
         cols = queries["adminsof"]["columns"]
 
+    if args.getnote:
+        query = query + ",n.notes"
+        cols.append("Notes")
+
     r = do_query(args, query)
     x = json.loads(r.text)
     entry_list = x["results"][0]["data"]
@@ -131,10 +135,15 @@ def get_info(args):
     if not args.quiet:
         print(" - ".join(cols))
     for value in entry_list:
+        # print(value)
         try:
             print(" - ".join(value["row"]))
         except:
-            pass
+            if len(cols) == 1:
+                pass
+            else:
+                print(" - ".join(map(str,value["row"])))
+
 
 
 def mark_owned(args):
