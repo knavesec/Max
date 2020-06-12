@@ -159,11 +159,10 @@ def mark_owned(args):
             r = do_query(args, query)
 
             fail_resp = '{"results":[{"columns":["n"],"data":[]}],"errors":[]}'
-            if not args.quiet:
-                if r.text == fail_resp:
-                    print("[-] AD Object: " + line.upper().strip() + " could not be marked as owned")
-                else:
-                    print("[+] AD Object: " + line.upper().strip() + " marked as owned successfully")
+            if r.text == fail_resp:
+                print("[-] AD Object: " + line.upper().strip() + " could not be marked as owned")
+            else:
+                print("[+] AD Object: " + line.upper().strip() + " marked as owned successfully")
 
 
 def mark_hvt(args):
@@ -181,11 +180,10 @@ def mark_hvt(args):
         r = do_query(args, query)
 
         fail_resp = '{"results":[{"columns":["n"],"data":[]}],"errors":[]}'
-        if not args.quiet:
-            if r.text == fail_resp:
-                print("[-] AD Object: " + line.upper().strip() + " could not be marked as HVT")
-            else:
-                print("[+] AD Object: " + line.upper().strip() + " marked as HVT successfully")
+        if r.text == fail_resp:
+            print("[-] AD Object: " + line.upper().strip() + " could not be marked as HVT")
+        else:
+            print("[+] AD Object: " + line.upper().strip() + " marked as HVT successfully")
 
 
 
@@ -193,7 +191,7 @@ def main():
 
     parser = argparse.ArgumentParser(description="Maximizing Bloodhound. Max is a good boy.")
 
-    general = parser.add_argument_group("Main Arguments")
+    general = parser.add_argument_group("Optional Arguments")
 
     # generic function parameters
     general.add_argument("-u",dest="username",default=global_username,help="Neo4j database username (Default: {})".format(global_username))
@@ -201,6 +199,7 @@ def main():
     general.add_argument("--url",dest="url",default=global_url,help="Neo4j database URL (Default: {})".format(global_url))
 
     # three options for the function
+    parser._positionals.title = "Available Modules"
     switch = parser.add_subparsers(dest='command')
     getinfo = switch.add_parser("get-info",help="Get info for users, computers, etc")
     markowned = switch.add_parser("mark-owned",help="Mark objects as Owned")
