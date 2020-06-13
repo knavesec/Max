@@ -126,7 +126,6 @@ def get_info(args):
     if not args.quiet:
         print(" - ".join(cols))
     for value in entry_list:
-        # print(value)
         try:
             print(" - ".join(value["row"]))
         except:
@@ -193,6 +192,31 @@ def mark_hvt(args):
                 print("[+] AD Object: " + line.upper().strip() + " marked as HVT successfully")
 
 
+def query_func(args):
+
+    r = do_query(args, args.QUERY)
+    x = json.loads(r.text)
+
+    try:
+        entry_list = x["results"][0]["data"]
+
+        for value in entry_list:
+            try:
+                print(" - ".join(value["row"]))
+            except:
+                if len(value["row"]) == 1:
+                    pass
+                else:
+                    print(" - ".join(map(str,value["row"])))
+
+    except:
+        if x['errors'][0]['code'] == "Neo.ClientError.Statement.SyntaxError":
+            print("Neo4j syntax error")
+            print(x['errors'][0]['message'])
+        else:
+            print("Uncaught error, sry")
+
+
 
 def main():
 
@@ -211,6 +235,7 @@ def main():
     getinfo = switch.add_parser("get-info",help="Get info for users, computers, etc")
     markowned = switch.add_parser("mark-owned",help="Mark objects as Owned")
     markhvt = switch.add_parser("mark-hvt",help="Mark items as High Value Targets (HVTs)")
+    query = switch.add_parser("query",help="Run a raw query & return results (must return node attributes like n.name or n.description)")
 
     # GETINFO function parameters
     getinfo_switch = getinfo.add_mutually_exclusive_group(required=True)
@@ -240,6 +265,12 @@ def main():
     markhvt.add_argument("--add-note",dest="notes",default="",help="Notes to add to all marked objects (reason for HVT status)")
     markhvt.add_argument("--clear",dest="clear",action="store_true",help="Remove HVT marker from all objects")
 
+    # QUERY function arguments
+    query.add_argument("QUERY",help="Query designation")
+
+
+
+
     args = parser.parse_args()
 
 
@@ -255,6 +286,8 @@ def main():
             print("Module mark-hvt requires either -f filename or --clear options")
         else:
             mark_hvt(args)
+    elif args.command == "query":
+        query_func(args)
     else:
         print("Error: use a module or use -h/--help to see help")
 

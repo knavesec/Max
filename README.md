@@ -47,6 +47,11 @@ Get a list of owned objects with the notes for each
 python3 max.py get-info --owned --get-note
 ```
 
+Running a query - return a list of all users with a path to DA
+```
+python3 max-test.py query "MATCH (n:User),(m:Group {name:'DOMAIN ADMINS@DOMAIN.LOCAL'}) MATCH p=shortestPath((n)-[*1..]->(m)) RETURN n.name"
+```
+
 ### In Depth Usage & Modules
 
 #### General
@@ -57,7 +62,7 @@ python3 max.py -h
 python3 max.py {module} -h
 ```
 
-There are 3 modules: `get-info`, `mark-owned`, `mark-hvt`
+There are 4 modules: `get-info`, `mark-owned`, `mark-hvt`, `query`
 
 #### Module: get-info
 
@@ -133,6 +138,27 @@ Few things to note:
 * `add-note` will set a note on all object, it's found in the BloodHound GUI. This can also be retrieved via the `get-notes` flag in the `get-info` module
 * `FILENAME` contents must include FQDN similar to the naming style of BloodHound objects. For more info see the "Object Files & Specification" section
 
+#### Module: query
+
+For the advanced BloodHound user, experience with Cypher queries required
+
+```
+python3 max.py query -h
+usage: max.py query [-h] QUERY
+
+positional arguments:
+  QUERY       Query designation
+
+optional arguments:
+  -h, --help  show this help message and exit
+```
+
+Few things to note:
+
+* Invalid syntax will return a syntax error and Neo4j debugging instructions  
+* Must return node attributes like: `n.name`, `n.description`, `n.owned`, etc (there are many more)
+* Unlike other modules, the notes in "Object Files & Specification" do not all apply, any object name must include FQDN but also must be capitalized, just like any query run in the browser
+* Main benefit is not having to copy-paste out of the Neo4j browser console
 
 #### Object Files & Specification
 
@@ -149,6 +175,6 @@ computer02               <- will not be added / incorrect CLI input
 
 ## Further work
 
-I hope to include an `analyze` function to provide some sort functionality similar to PlumHound/Cypheroth. Also hoping to include a `query` function that would allow using custom queries to retrive lists. TBD
+I hope to include an `analyze` function to provide some sort functionality similar to PlumHound/Cypheroth. TBD
 
 Any other features and improvements welcome, find me @knavesec in the BloodHoundGang Slack channel and on Twitter
