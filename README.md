@@ -50,7 +50,7 @@ python3 max.py get-info --owned --get-note
 
 Running a query - return a list of all users with a path to DA
 ```
-python3 max-test.py query "MATCH (n:User),(m:Group {name:'DOMAIN ADMINS@DOMAIN.LOCAL'}) MATCH p=shortestPath((n)-[*1..]->(m)) RETURN n.name"
+python3 max.py query "MATCH (n:User),(m:Group {name:'DOMAIN ADMINS@DOMAIN.LOCAL'}) MATCH p=shortestPath((n)-[*1..]->(m)) RETURN n.name"
 ```
 
 ### In Depth Usage & Modules
