@@ -167,23 +167,30 @@ def mark_owned(args):
 
 def mark_hvt(args):
 
+    if (args.clear):
 
-    note_string = ""
-    if args.notes != "":
-        note_string = "SET n.notes=\"" + args.notes + "\""
+        query = 'MATCH (n) WHERE n.highvalue=true SET n.highvalue=false'
+        r = do_query(args,query)
+        print("'High Value' attribute removed from all objects.")
 
-    f = open(args.filename).readlines()
+    else:
 
-    for line in f:
+        note_string = ""
+        if args.notes != "":
+            note_string = "SET n.notes=\"" + args.notes + "\""
 
-        query = 'MATCH (n) WHERE n.name="{uname}" SET n.highvalue=true {notes} RETURN n'.format(uname=line.upper().strip(),notes=note_string)
-        r = do_query(args, query)
+        f = open(args.filename).readlines()
 
-        fail_resp = '{"results":[{"columns":["n"],"data":[]}],"errors":[]}'
-        if r.text == fail_resp:
-            print("[-] AD Object: " + line.upper().strip() + " could not be marked as HVT")
-        else:
-            print("[+] AD Object: " + line.upper().strip() + " marked as HVT successfully")
+        for line in f:
+
+            query = 'MATCH (n) WHERE n.name="{uname}" SET n.highvalue=true {notes} RETURN n'.format(uname=line.upper().strip(),notes=note_string)
+            r = do_query(args, query)
+
+            fail_resp = '{"results":[{"columns":["n"],"data":[]}],"errors":[]}'
+            if r.text == fail_resp:
+                print("[-] AD Object: " + line.upper().strip() + " could not be marked as HVT")
+            else:
+                print("[+] AD Object: " + line.upper().strip() + " marked as HVT successfully")
 
 
 
@@ -226,11 +233,12 @@ def main():
     # MARKOWNED function paramters
     markowned.add_argument("-f","--file",dest="filename",default="",required=False,help="Filename containing AD objects (must have FQDN attached)")
     markowned.add_argument("--add-note",dest="notes",default="",help="Notes to add to all marked objects (method of compromise)")
-    markowned.add_argument("--clear",dest="clear",action="store_true",help="Removed owned marker from all objects")
+    markowned.add_argument("--clear",dest="clear",action="store_true",help="Remove owned marker from all objects")
 
     # MARKHVT function parameters
     markhvt.add_argument("-f","--file",dest="filename",default="",required=False,help="Filename containing AD objects (must have FQDN attached)")
     markhvt.add_argument("--add-note",dest="notes",default="",help="Notes to add to all marked objects (reason for HVT status)")
+    markhvt.add_argument("--clear",dest="clear",action="store_true",help="Remove HVT marker from all objects")
 
     args = parser.parse_args()
 
@@ -238,9 +246,15 @@ def main():
     if args.command == "get-info":
         get_info(args)
     elif args.command == "mark-owned":
-        mark_owned(args)
+        if args.filename == "" and args.clear == False:
+            print("Module mark-owned requires either -f filename or --clear options")
+        else:
+            mark_owned(args)
     elif args.command == "mark-hvt":
-        mark_hvt(args)
+        if args.filename == "" and args.clear == False:
+            print("Module mark-hvt requires either -f filename or --clear options")
+        else:
+            mark_hvt(args)
     else:
         print("Error: use a module or use -h/--help to see help")
 
