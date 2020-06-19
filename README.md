@@ -6,6 +6,7 @@ A simple suite of tools:
 - Pull lists of information from the Neo4j database
 - Mark a list of objects as Owned
 - Mark a list of objects as High Value Targets
+- Run a raw Cypher query and return output
 
 ## Usage
 
@@ -48,7 +49,7 @@ python3 max.py get-info --owned --get-note
 
 Running a query - return a list of all users with a path to DA
 ```
-python3 max-test.py query "MATCH (n:User),(m:Group {name:'DOMAIN ADMINS@DOMAIN.LOCAL'}) MATCH (n)-[*1..]->(m) RETURN DISTINCT(n.name),n.owned"
+python3 max.py query "MATCH (n:User),(m:Group {name:'DOMAIN ADMINS@DOMAIN.LOCAL'}) MATCH (n)-[*1..]->(m) RETURN DISTINCT(n.name)"
 ```
 
 ### In Depth Usage & Modules
