@@ -123,7 +123,7 @@ def get_info(args):
     x = json.loads(r.text)
     entry_list = x["results"][0]["data"]
 
-    if not args.quiet:
+    if args.label:
         print(" - ".join(cols))
     for value in entry_list:
         try:
@@ -253,7 +253,7 @@ def main():
     getinfo_switch.add_argument("--admincomps",dest="admincomps",default=False,action="store_true",help="Return all computers with admin privileges to another computer [Comp1-AdminTo->Comp2]")
 
     getinfo.add_argument("--get-note",dest="getnote",default=False,action="store_true",help="Return the \"notes\" attribute for whatever objects are returned")
-    getinfo.add_argument("-q",dest="quiet",action="store_true",default=False,help="Quiet mode, suppress column headers from output")
+    getinfo.add_argument("-l",dest="label",action="store_true",default=False,help="Apply labels to the columns returned")
 
     # MARKOWNED function paramters
     markowned.add_argument("-f","--file",dest="filename",default="",required=False,help="Filename containing AD objects (must have FQDN attached)")

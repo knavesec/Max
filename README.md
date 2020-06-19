@@ -31,7 +31,6 @@ Get list of users (apply quiet -q to remove "Username" label)
 ```
 python3 max.py get-info --users
 
-UserName
 USER01@DOMAIN.LOCAL
 USER02@DOMAIN.LOCAL
 ...
@@ -49,7 +48,7 @@ python3 max.py get-info --owned --get-note
 
 Running a query - return a list of all users with a path to DA
 ```
-python3 max-test.py query "MATCH (n:User),(m:Group {name:'DOMAIN ADMINS@DOMAIN.LOCAL'}) MATCH p=shortestPath((n)-[*1..]->(m)) RETURN n.name"
+python3 max-test.py query "MATCH (n:User),(m:Group {name:'DOMAIN ADMINS@DOMAIN.LOCAL'}) MATCH (n)-[*1..]->(m) RETURN DISTINCT(n.name),n.owned"
 ```
 
 ### In Depth Usage & Modules
@@ -68,7 +67,7 @@ There are 4 modules: `get-info`, `mark-owned`, `mark-hvt`, `query`
 
 ```
 python3 max.py get-info -h
-usage: max.py get-info [-h] (--users | --comps | --groups | --das | --unconst | --npusers | --adminto UNAME | --adminsof COMP | --owned | --hvt | --desc | --admincomps) [--get-note] [-q]
+usage: max.py get-info [-h] (--users | --comps | --groups | --das | --unconst | --npusers | --adminto UNAME | --adminsof COMP | --owned | --hvt | --desc | --admincomps) [--get-note] [-l]
 
 optional arguments:
   -h, --help       show this help message and exit
@@ -85,7 +84,7 @@ optional arguments:
   --desc           Return all users with the description field populated (also returns description)
   --admincomps     Return all computers with admin privileges to another computer [Comp1-AdminTo->Comp2]
   --get-note       Return the "notes" attribute for whatever objects are returned
-  -q               Quiet mode, suppress column headers from output
+  -l               Apply labels to the columns returned
 ```
 
 Few things to note:
@@ -96,7 +95,7 @@ Few things to note:
 * `adminto` returns a all computers `UNAME` is local admin to. Useful for offline cred spraying & dumps
 * `adminsof` returns a list of all the users that have administrative privileges to `COMP`
 * `get-note` returns the notes of each object, typically used with the `add-note` function in the `mark-*` modules
-* `-q` suppresses column headers. All queries with `get-info` return column headers (like "UserName","ComputerName","Description",etc) with the query. If outputting to a file this should be used so the header does not contaminate the first line of your data
+* `-l` apply column labels as a header. All queries with `get-info` do not return column headers (like "UserName","ComputerName","Description",etc) by default with the query
 
 #### Module: mark-owned
 
