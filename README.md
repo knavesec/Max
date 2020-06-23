@@ -10,6 +10,10 @@ A simple suite of tools:
 
 ## Usage
 
+### Installation
+
+Ideally there shouldn't be much to install, it uses pythons standard libraries. You may have to `pip3 install` a library or two if you don't have it. Tested on Kali linux.
+
 ### Neo4j Creds
 
 Neo4j credentials can be hardcoded at the beginning of the script *OR* they can be provided as CLI
@@ -28,7 +32,7 @@ python3 max.py mark-owned -f owned.txt
 python3 max.py mark-owned -f owned.txt --add-note "Owned by repeated local admin"
 ```
 
-Get list of users (apply quiet -q to remove "Username" label)
+Get list of users
 ```
 python3 max.py get-info --users
 
@@ -68,13 +72,14 @@ There are 4 modules: `get-info`, `mark-owned`, `mark-hvt`, `query`
 
 ```
 python3 max.py get-info -h
-usage: max.py get-info [-h] (--users | --comps | --groups | --das | --unconst | --npusers | --adminto UNAME | --adminsof COMP | --owned | --hvt | --desc | --admincomps) [--get-note] [-l]
+usage: max.py get-info [-h] (--users | --comps | --groups | --groups-full | --das | --unconst | --npusers | --adminto UNAME | --adminsof COMP | --owned | --hvt | --desc | --admincomps) [--get-note] [-l]
 
 optional arguments:
   -h, --help       show this help message and exit
   --users          Return a list of all domain users
   --comps          Return a list of all domain computers
   --groups         Return a list of all domain groups
+  --groups-full    Return a list of all domain groups with all respective group members
   --das            Return a list of all Domain Admins
   --unconst        Return a list of all objects configured with Unconstrained Delegation
   --npusers        Return a list of all users that don't require Kerberos Pre-Auth (AS-REP roastable)
@@ -91,6 +96,7 @@ optional arguments:
 Few things to note:
 
 * `users`, `comps`, `groups`, `das`, `unconst`, `npusers`, `owned`, `hvt` all return simple lists
+* `groups-full` returns all domain groups with their respective members in the format `group@domain.local - member_node_name`
 * `desc` returns users configured with a description in the format `username@domain.local - description`
 * `admincomps` returns computers that are configured with admin rights for another computer in the format `admincomp.domain.local - victimcomp.domain.local`. Useful for relay attacks
 * `adminto` returns a all computers `UNAME` is local admin to. Useful for offline cred spraying & dumps
@@ -175,6 +181,6 @@ computer02               <- will not be added / incorrect CLI input
 
 ## Further work
 
-I hope to include an `analyze` function to provide some sort functionality similar to PlumHound/Cypheroth. TBD
+I hope to include an `analyze` function to provide some sort functionality similar to PlumHound/Cypheroth. Additionally planning on an `add-relationship` style module for large scale creation of relationships within the database. Lastly, thinking about creating a Powershell version for those running Neo4j on Windows, but I'm trash at Powershell so TBD.
 
 Any other features and improvements welcome, find me @knavesec in the BloodHoundGang Slack channel and on Twitter

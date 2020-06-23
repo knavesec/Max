@@ -38,6 +38,10 @@ def get_info(args):
             "query": "MATCH (n:Group) RETURN n.name",
             "columns" : ["GroupName"]
             },
+        "groups-full" : {
+            "query": "MATCH (n),(g:Group) MATCH (n)-[r:MemberOf]->(g) RETURN g.name,n.name",
+            "columns" : ["GroupName","MemberName"]
+        },
         "das" : {
             "query": "MATCH p =(n:User)-[r:MemberOf*1..]->(g:Group) WHERE g.name=~'DOMAIN ADMINS@.*' RETURN n.name",
             "columns" : ["UserName"]
@@ -87,6 +91,9 @@ def get_info(args):
     elif (args.groups):
         query = queries["groups"]["query"]
         cols = queries["groups"]["columns"]
+    elif (args.groupsfull):
+        query = queries["groups-full"]["query"]
+        cols = queries["groups-full"]["columns"]
     elif (args.das):
         query = queries["das"]["query"]
         cols = queries["das"]["columns"]
@@ -133,7 +140,6 @@ def get_info(args):
                 pass
             else:
                 print(" - ".join(map(str,value["row"])))
-
 
 
 def mark_owned(args):
@@ -217,12 +223,11 @@ def query_func(args):
             print("Uncaught error, sry")
 
 
-
 def main():
 
     parser = argparse.ArgumentParser(description="Maximizing Bloodhound. Max is a good boy.")
 
-    general = parser.add_argument_group("Optional Arguments")
+    general = parser.add_argument_group("global arguments")
 
     # generic function parameters
     general.add_argument("-u",dest="username",default=global_username,help="Neo4j database username (Default: {})".format(global_username))
@@ -230,7 +235,7 @@ def main():
     general.add_argument("--url",dest="url",default=global_url,help="Neo4j database URL (Default: {})".format(global_url))
 
     # three options for the function
-    parser._positionals.title = "Available Modules"
+    parser._positionals.title = "available modules"
     switch = parser.add_subparsers(dest='command')
     getinfo = switch.add_parser("get-info",help="Get info for users, computers, etc")
     markowned = switch.add_parser("mark-owned",help="Mark objects as Owned")
@@ -242,6 +247,7 @@ def main():
     getinfo_switch.add_argument("--users",dest="users",default=False,action="store_true",help="Return a list of all domain users")
     getinfo_switch.add_argument("--comps",dest="comps",default=False,action="store_true",help="Return a list of all domain computers")
     getinfo_switch.add_argument("--groups",dest="groups",default=False,action="store_true",help="Return a list of all domain groups")
+    getinfo_switch.add_argument("--groups-full",dest="groupsfull",default=False,action="store_true",help="Return a list of all domain groups with all respective group members")
     getinfo_switch.add_argument("--das",dest="das",default=False,action="store_true",help="Return a list of all Domain Admins")
     getinfo_switch.add_argument("--unconst",dest="unconstrained",default=False,action="store_true",help="Return a list of all objects configured with Unconstrained Delegation")
     getinfo_switch.add_argument("--npusers",dest="nopreauth",default=False,action="store_true",help="Return a list of all users that don't require Kerberos Pre-Auth (AS-REP roastable)")
@@ -252,8 +258,8 @@ def main():
     getinfo_switch.add_argument("--desc",dest="desc",default=False,action="store_true",help="Return all users with the description field populated (also returns description)")
     getinfo_switch.add_argument("--admincomps",dest="admincomps",default=False,action="store_true",help="Return all computers with admin privileges to another computer [Comp1-AdminTo->Comp2]")
 
-    getinfo.add_argument("--get-note",dest="getnote",default=False,action="store_true",help="Return the \"notes\" attribute for whatever objects are returned")
-    getinfo.add_argument("-l",dest="label",action="store_true",default=False,help="Apply labels to the columns returned")
+    getinfo.add_argument("--get-note",dest="getnote",default=False,action="store_true",help="Optional, return the \"notes\" attribute for whatever objects are returned")
+    getinfo.add_argument("-l",dest="label",action="store_true",default=False,help="Optional, apply labels to the columns returned")
 
     # MARKOWNED function paramters
     markowned.add_argument("-f","--file",dest="filename",default="",required=False,help="Filename containing AD objects (must have FQDN attached)")
@@ -268,11 +274,7 @@ def main():
     # QUERY function arguments
     query.add_argument("QUERY",help="Query designation")
 
-
-
-
     args = parser.parse_args()
-
 
     if args.command == "get-info":
         get_info(args)
@@ -290,7 +292,6 @@ def main():
         query_func(args)
     else:
         print("Error: use a module or use -h/--help to see help")
-
 
 
 if __name__ == "__main__":
