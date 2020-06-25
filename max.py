@@ -13,6 +13,15 @@ global_username = "neo4j"
 global_password = "bloodhound"
 
 
+def do_test(args):
+
+    try:
+        requests.get(args.url + global_uri)
+        return True
+    except:
+        return False
+
+
 def do_query(args, query):
 
         data = {"statements":[{"statement":query}]}
@@ -275,6 +284,11 @@ def main():
     query.add_argument("QUERY",help="Query designation")
 
     args = parser.parse_args()
+
+
+    if not do_test(args):
+        print("Connection error: restart Neo4j console or verify the the following URL is available: http://127.0.0.1:7474")
+        exit()
 
     if args.command == "get-info":
         get_info(args)
