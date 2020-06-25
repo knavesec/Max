@@ -8,7 +8,7 @@ import json
 global_url = "http://127.0.0.1:7474"
 global_uri = "/db/data/transaction/commit"
 
-# option to hardcode creds, these will be used as the username and password "defaults"
+# option to hardcode Neo4j database creds, these will be used as the username and password "defaults"
 global_username = "neo4j"
 global_password = "bloodhound"
 
@@ -24,11 +24,17 @@ def do_test(args):
 
 def do_query(args, query):
 
-        data = {"statements":[{"statement":query}]}
-        headers = {'Content-type': 'application/json', 'Accept': 'application/json; charset=UTF-8'}
-        auth = HTTPBasicAuth(args.username, args.password)
+    data = {"statements":[{"statement":query}]}
+    headers = {'Content-type': 'application/json', 'Accept': 'application/json; charset=UTF-8'}
+    auth = HTTPBasicAuth(args.username, args.password)
 
-        return requests.post(args.url + global_uri, auth=auth, headers=headers, json=data)
+    r = requests.post(args.url + global_uri, auth=auth, headers=headers, json=data)
+
+    if r.status_code == 401:
+        print("Authentication error: the supplied credentials are incorrect for the Neo4j database, specify new credentials with -u & -p or hardcode your credentials at the top of the script")
+        exit()
+    else:
+        return r
 
 
 def get_info(args):
@@ -138,6 +144,7 @@ def get_info(args):
     r = do_query(args, query)
     x = json.loads(r.text)
     entry_list = x["results"][0]["data"]
+
 
     if args.label:
         print(" - ".join(cols))
