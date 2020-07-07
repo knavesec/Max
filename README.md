@@ -8,6 +8,8 @@ A simple suite of tools:
 - Mark a list of objects as High Value Targets
 - Run a raw Cypher query and return output
 
+This was released with screenshots & use-cases on the following blog: https://whynotsecurity.com/blog/max/ 
+
 ## Usage
 
 ### Installation
