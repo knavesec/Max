@@ -7,6 +7,8 @@ A simple suite of tools:
 - Mark a list of objects as Owned
 - Mark a list of objects as High Value Targets
 - Run a raw Cypher query and return output
+- Delete an edge from the database
+- Create HasSPNConfigured & SharesPasswordWith relationships
 
 ## Usage
 
