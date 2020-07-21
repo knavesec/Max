@@ -298,7 +298,7 @@ def add_spns(args):
 
 def add_spw(args):
 
-    statement = "MATCH (n {{name:\"{name1}\"}}),(m {{name:\"{name2}\"}}) MERGE (n)-[r1:SharesPasswordWith]->(m) MERGE (m)-[r2:SharesPasswordWith]->(n) return n,m"
+    statement = "MATCH (n {{name:\"{name1}\"}}),(m {{name:\"{name2}\"}}) MERGE (n)-[r1:SharesPasswordWith {{isacl: false}}]->(m) MERGE (m)-[r2:SharesPasswordWith {{isacl: false}}]->(n) return n,m"
 
     objs = open(args.filename,'r').readlines()
 

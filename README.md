@@ -56,6 +56,17 @@ Running a query - return a list of all users with a path to DA
 python3 max.py query "MATCH (n:User),(m:Group {name:'DOMAIN ADMINS@DOMAIN.LOCAL'}) MATCH (n)-[*1..]->(m) RETURN DISTINCT(n.name)"
 ```
 
+Delete an edge from the database
+```
+python3 max.py del-edge CanRDP
+```
+
+Add HasSPNConfigured relationship using the information stored within BloodHound, or with a GetUserSPNs impacket file
+```
+python3 max.py add-spns -b
+python3 max.py add-spns -i getuserspns-raw-output.txt
+```
+
 ### In Depth Usage & Modules
 
 #### General
@@ -66,9 +77,11 @@ python3 max.py -h
 python3 max.py {module} -h
 ```
 
-There are 4 modules: `get-info`, `mark-owned`, `mark-hvt`, `query`
+There are 8 modules: `get-info`, `mark-owned`, `mark-hvt`, `query`, `del-edge`, `add-spns`, `add-spw`, `pet-max`
 
 #### Module: get-info
+
+Basic module to extract information from the database with easy output to a bash-flow workspace
 
 ```
 python3 max.py get-info -h
@@ -106,6 +119,8 @@ Few things to note:
 
 #### Module: mark-owned
 
+Bulk import of owned assets into the database
+
 ```
 python3 max.py mark-owned -h
 usage: max.py mark-owned [-h] [-f FILENAME] [--add-note NOTES] [--clear]
@@ -124,7 +139,11 @@ Few things to note:
 * `add-note` will set a note on all object, it's found in the BloodHound GUI. This can also be retrieved via the `get-notes` flag in the `get-info` module
 * `FILENAME` contents must include FQDN similar to the naming style of BloodHound objects. For more info see the "Object Files & Specification" section
 
+Query being run: ```MATCH (n) WHERE n.name="uname" SET n.owned=true RETURN n```
+
 #### Module: mark-hvt
+
+Bulk import of high value targets into the database
 
 ```
 python3 max.py mark-hvt -h
@@ -144,9 +163,11 @@ Few things to note:
 * `add-note` will set a note on all object, it's found in the BloodHound GUI. This can also be retrieved via the `get-notes` flag in the `get-info` module
 * `FILENAME` contents must include FQDN similar to the naming style of BloodHound objects. For more info see the "Object Files & Specification" section
 
+Query being run: ```MATCH (n) WHERE n.name="uname" SET n.highvalue=true RETURN n```
+
 #### Module: query
 
-For the advanced BloodHound user, experience with Cypher queries required
+For the advanced BloodHound user, experience with Cypher queries required. Allows for running raw Cypher queries and returning the output to the terminal
 
 ```
 python3 max.py query -h
@@ -165,6 +186,81 @@ Few things to note:
 * Must return node attributes like: `n.name`, `n.description`, `n.owned`, etc (there are many more)
 * Unlike other modules, the notes in "Object Files & Specification" do not all apply, any object name must include FQDN but also must be capitalized, just like any query run in the browser
 * Main benefit is not having to copy-paste out of the Neo4j browser console
+
+#### Module: del-edge
+
+Module for deleting an edge type from the database (warning: irreversible)
+
+```
+python3 max.py del-edge -h
+usage: max.py del-edge [-h] EDGENAME
+
+positional arguments:
+  EDGENAME    Edge name, example: CanRDP, ExecuteDCOM, etc
+
+optional arguments:
+  -h, --help  show this help message and exit
+```
+
+Few things to note:
+* `EDGENAME` is CaseSensitive
+* This is not reversible, it will delete all edges of this type from the database. Re-importing the BH data will put the relationships back
+
+Query being run: ```MATCH p=()-[r:{edge}]->() DELETE r RETURN COUNT(DISTINCT(p))```
+
+#### Module: add-spns
+
+Adds the HasSPNConfigured relationship to objects in the database. This compromise path is based on the theory that service accounts store their cleartext credentials in LSA secrets and are easily retrieved with the right privileges. A Service Principal Name (SPN) identifies where service accounts are configured, and therefore may indicate that there are stored credentials in LSA secrets. This creates a relationship based on this: access to a computer could lead to the compromise of that user. In my experience it's accurate roughly 2/3s of the time, though it varies from client to client.
+
+```
+python3 max.py add-spns -h
+usage: max.py add-spns [-h] (-b | -f FILENAME | -i IFILENAME)
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -b, --bloodhound      Uses information already stored in BloodHound (must have already ingested 'Detailed' user information)
+  -f FILENAME, --file FILENAME
+                        Standard file Format: Computer, User
+  -i IFILENAME, --impacket IFILENAME
+                        Impacket file Format: Output of GetUserSPNs.py
+```
+
+Few things to note:
+* These relationships are NOT guaranteed, just sometimes an avenue for escalation
+* `-b` flag is the easiest, it will use the SPN information already stored in BH, though it requires that detailed data was ingested (collectionmethod All/ObjectProps)
+* `-i` Impacket style is super simple as well, it basically takes the raw input from GetUserSPNs as a file input. No need to edit the file, just `GetUserSPNs > file.txt` -> `max add-spns -i file.txt`
+* `-f` More tedious than the previous two, but sometimes necessary. Raw file input of `Computer, User`, one per line, relationship created would be `Computer - HasSPNConfigured -> User`
+
+Query being run: ```MATCH (n:User {name:"uname"}) MATCH (m:Computer {name:"comp"}}) MERGE (m)-[r:HasSPNConfigured {isacl: false}]->(n) return n,m```
+
+#### Module: add-spw
+
+Adds the SharesPasswordWith relationship to objects in the database. Takes a list of objects, then creates bidirectional edges between all objects, indicating a possible pivot path between the objects. Mostly useful for analysis, this was taken from porterhau5's BloodHound-Owned tool.
+
+```
+python3 max.py add-spw -h
+usage: max.py add-spw [-h] [-f FILENAME]
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -f FILENAME, --file FILENAME
+                        Filename containing AD objects, one per line (must have FQDN attached)
+```
+
+Few things to note:
+* File is simply a list of AD objects, one per line, with the full FQDN attached. Useful for AD user pwd reuse as well as repeated local administrator
+* A bidirectional relationship will be created between every single node in that file (unless the node doesn't exist)
+* Not super practical for actual tests since you need to know in advance which objects have shared passwords, but nice for analysis to see who now has a path to DA with the relationship applied
+
+Query being run: ```MATCH (n {name:"name1"}),(m {name:"name2"}) MERGE (n)-[r1:SharesPasswordWith {isacl: false}]->(m) MERGE (m)-[r2:SharesPasswordWith {isacl: false}]->(n) return n,m```
+
+#### Module: pet-max
+
+This one's a surprise!
+
+```
+python3 max.py pet-max
+```
 
 #### Object Files & Specification
 
