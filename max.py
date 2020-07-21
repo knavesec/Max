@@ -3,38 +3,24 @@ from requests.auth import HTTPBasicAuth
 import sys
 import argparse
 import json
+import random
 
 # option to hardcode URL & URI
 global_url = "http://127.0.0.1:7474"
 global_uri = "/db/data/transaction/commit"
 
-# option to hardcode Neo4j database creds, these will be used as the username and password "defaults"
+# option to hardcode creds, these will be used as the username and password "defaults"
 global_username = "neo4j"
 global_password = "bloodhound"
 
 
-def do_test(args):
-
-    try:
-        requests.get(args.url + global_uri)
-        return True
-    except:
-        return False
-
-
 def do_query(args, query):
 
-    data = {"statements":[{"statement":query}]}
-    headers = {'Content-type': 'application/json', 'Accept': 'application/json; charset=UTF-8'}
-    auth = HTTPBasicAuth(args.username, args.password)
+        data = {"statements":[{"statement":query}]}
+        headers = {'Content-type': 'application/json', 'Accept': 'application/json; charset=UTF-8'}
+        auth = HTTPBasicAuth(args.username, args.password)
 
-    r = requests.post(args.url + global_uri, auth=auth, headers=headers, json=data)
-
-    if r.status_code == 401:
-        print("Authentication error: the supplied credentials are incorrect for the Neo4j database, specify new credentials with -u & -p or hardcode your credentials at the top of the script")
-        exit()
-    else:
-        return r
+        return requests.post(args.url + global_uri, auth=auth, headers=headers, json=data)
 
 
 def get_info(args):
@@ -145,7 +131,6 @@ def get_info(args):
     x = json.loads(r.text)
     entry_list = x["results"][0]["data"]
 
-
     if args.label:
         print(" - ".join(cols))
     for value in entry_list:
@@ -158,13 +143,14 @@ def get_info(args):
                 print(" - ".join(map(str,value["row"])))
 
 
+
 def mark_owned(args):
 
     if (args.clear):
 
         query = 'MATCH (n) WHERE n.owned=true SET n.owned=false'
         r = do_query(args,query)
-        print("'Owned' attribute removed from all objects.")
+        print("[+] 'Owned' attribute removed from all objects.")
 
     else:
 
@@ -192,7 +178,7 @@ def mark_hvt(args):
 
         query = 'MATCH (n) WHERE n.highvalue=true SET n.highvalue=false'
         r = do_query(args,query)
-        print("'High Value' attribute removed from all objects.")
+        print("[+] 'High Value' attribute removed from all objects.")
 
     else:
 
@@ -239,11 +225,145 @@ def query_func(args):
             print("Uncaught error, sry")
 
 
+def delete_edge(args):
+
+    query = 'MATCH p=()-[r:{edge}]->() DELETE r RETURN COUNT(DISTINCT(p))'.format(edge=args.EDGENAME)
+    r = do_query(args,query)
+    number = json.loads(r.text)['results'][0]['data'][0]['row'][0]
+    print("[+] '{edge}' edge removed from {number} object relationships".format(edge=args.EDGENAME,number=number))
+
+
+def add_spns(args):
+
+#### relationships created tally
+
+    statement = "MATCH (n:User {{name:\"{uname}\"}}) MATCH (m:Computer {{name:\"{comp}\"}}) MERGE (m)-[r:HasSPNConfigured {{isacl: false}}]->(n) return n,m"
+    # [ [computer, user], ... ]
+    objects = []
+
+    if args.filename != "":
+        lines = open(args.filename).readlines()
+        for line in lines:
+            objects.append([line.split(',')[0].strip().upper(), line.split(',')[1].strip().upper()])
+
+    elif args.ifilename != "":
+        lines = open(args.ifilename).readlines()
+        lines = lines[4:]
+        spns = []
+        i = 0
+        while lines[i].strip() != '':
+            spns.append(list(filter(('').__ne__,lines[i].strip().split("  ")))) # impacket uses a 2 space value between items, use this split hack to get around spaces in values
+            i += 1
+        for line in spns:
+            spn = line[0].strip().split(":")[0].split('/')[1].upper()
+            uname = line[1].strip().upper()
+            domain = '.'.join(line[2].strip().split("DC=")[1:]).replace(',','').upper()
+            if domain not in spn:
+                spn = spn + '.' + domain
+            uname = uname + '@' + domain
+            if [spn,uname] not in objects:
+                objects.append([spn,uname])
+
+    elif args.blood:
+
+        statement1 = "MATCH (n:User {hasspn:true}) RETURN n.name,n.serviceprincipalnames"
+        r = do_query(args,statement1)
+        spns = json.loads(r.text)['results'][0]['data']
+        for user in spns:
+            uname = user['row'][0]
+            for fullspn in user['row'][1]:
+                spn = fullspn.split(":")[0].split("/")[1].upper()
+                if [spn,uname] not in objects:
+                    objects.append([spn,uname])
+
+    else:
+        print("Unknown file name")
+
+    count = 0
+    for set in objects:
+
+        query = statement.format(uname=set[1],comp=set[0])
+
+        r = do_query(args, query)
+
+        fail_resp = '{"results":[{"columns":["n","m"],"data":[]}],"errors":[]}'
+        if r.text == fail_resp:
+            print("[-] Relationship " + set[0] + " -- HasSPNConfigured -> " + set[1] + " could not be added")
+        else:
+            print("[+] Relationship " + set[0] + " -- HasSPNConfigured -> " + set[1] + " added")
+            count = count + 1
+
+    print('HasSPNConfigured relationships created: ' + str(count))
+
+
+def add_spw(args):
+
+    statement = "MATCH (n {{name:\"{name1}\"}}),(m {{name:\"{name2}\"}}) MERGE (n)-[r1:SharesPasswordWith]->(m) MERGE (m)-[r2:SharesPasswordWith]->(n) return n,m"
+
+    objs = open(args.filename,'r').readlines()
+
+    count = 0
+
+    for i in range(0,len(objs)):
+        name1 = objs[i].strip().upper()
+        print("[+] Creating relationships for " + name1)
+        for j in range(i + 1,len(objs)):
+            name2 = objs[j].strip().upper()
+            #print("query: " + str(i) + ' ' + str(j))
+            query = statement.format(name1=name1,name2=name2)
+            r = do_query(args,query)
+
+            fail_resp = '{"results":[{"columns":["n","m"],"data":[]}],"errors":[]}'
+            if r.text != fail_resp:
+                count = count + 1
+
+    print("SharesPasswordWith relationships created: " + str(count))
+
+
+def pet_max():
+
+    messages = [
+        "Max is a good boy",
+        "Woof!",
+        "Bloodhound is great!",
+        "Black Lives Matter!",
+        "Remember to vote!",
+        "Wear a mask!",
+        "Hack the planet!",
+        "10/10 would pet - @blurbdust",
+        "dogsay > cowsay - @b1gbroth3r"
+
+    ]
+
+    max = """
+                                        \\   /
+         /|                   ______     \\ |
+        { (                  /( ) ^ `--o  |/
+         \ \________________/     ____/
+          \                       /
+           (    >    ___   >     )
+            \_      )   \____\  \\\\
+             )   /\ (         `. ))
+             (  {  \_\_       / //
+              \_\_  '''       '''
+               '''
+    """
+
+    m = messages[random.randint(0,len(messages)-1)]
+    num = 47 - len(m) - 15
+    message = ""
+    message = message + ' '*num + " -------" + '-'*len(m) + "------- \n"
+    message = message + ' '*num + "{       " + m          + "       }\n"
+    message = message + ' '*num + " -------" + '-'*len(m) + "     -- "
+
+    print(message + max)
+
+
 def main():
 
     parser = argparse.ArgumentParser(description="Maximizing Bloodhound. Max is a good boy.")
 
-    general = parser.add_argument_group("global arguments")
+    general = parser.add_argument_group("Optional Arguments")
 
     # generic function parameters
     general.add_argument("-u",dest="username",default=global_username,help="Neo4j database username (Default: {})".format(global_username))
@@ -251,12 +371,16 @@ def main():
     general.add_argument("--url",dest="url",default=global_url,help="Neo4j database URL (Default: {})".format(global_url))
 
     # three options for the function
-    parser._positionals.title = "available modules"
+    parser._positionals.title = "Available Modules"
     switch = parser.add_subparsers(dest='command')
     getinfo = switch.add_parser("get-info",help="Get info for users, computers, etc")
     markowned = switch.add_parser("mark-owned",help="Mark objects as Owned")
     markhvt = switch.add_parser("mark-hvt",help="Mark items as High Value Targets (HVTs)")
     query = switch.add_parser("query",help="Run a raw query & return results (must return node attributes like n.name or n.description)")
+    deleteedge = switch.add_parser("del-edge",help="Remove every edge of a certain type. Why filter when you can delete? (Warning, irreversible)")
+    addspns = switch.add_parser("add-spns",help="Create 'HasSPNConfigured' relationships with targets from a file or stored BloodHound data. Adds possible path of compromise edge via cleartext service account credentials stored within LSA Secrets")
+    addspw = switch.add_parser("add-spw",help="Create 'SharesPasswordWith' relationships with targets from a file. Adds edge indicating two objects share a password (repeated local administrator)")
+    petmax = switch.add_parser("pet-max",help="Pet max, hes a good boy")
 
     # GETINFO function parameters
     getinfo_switch = getinfo.add_mutually_exclusive_group(required=True)
@@ -290,12 +414,20 @@ def main():
     # QUERY function arguments
     query.add_argument("QUERY",help="Query designation")
 
+    # DELETEEDGE function parameters
+    deleteedge.add_argument("EDGENAME",help="Edge name, example: CanRDP, ExecuteDCOM, etc")
+
+    # ADDSPNS function parameters
+    addspns_switch = addspns.add_mutually_exclusive_group(required=True)
+    addspns_switch.add_argument("-b","--bloodhound",dest="blood",action="store_true",help="Uses information already stored in BloodHound (must have already ingested 'Detailed' user information)")
+    addspns_switch.add_argument("-f","--file",dest="filename",default="",help="Standard file Format: Computer, User")
+    addspns_switch.add_argument("-i","--impacket",dest="ifilename",default="",help="Impacket file Format: Output of GetUserSPNs.py")
+
+    # ADDEDGE function parameters
+    addspw.add_argument("-f","--file",dest="filename",default="",required=False,help="Filename containing AD objects, one per line (must have FQDN attached)")
+
     args = parser.parse_args()
 
-
-    if not do_test(args):
-        print("Connection error: restart Neo4j console or verify the the following URL is available: http://127.0.0.1:7474")
-        exit()
 
     if args.command == "get-info":
         get_info(args)
@@ -311,8 +443,17 @@ def main():
             mark_hvt(args)
     elif args.command == "query":
         query_func(args)
+    elif args.command == "del-edge":
+        delete_edge(args)
+    elif args.command == "add-spns":
+        add_spns(args)
+    elif args.command == "add-spw":
+        add_spw(args)
+    elif args.command == "pet-max":
+        pet_max()
     else:
         print("Error: use a module or use -h/--help to see help")
+
 
 
 if __name__ == "__main__":
