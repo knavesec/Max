@@ -39,6 +39,10 @@ def get_info(args):
             "query": "MATCH (n:Group) RETURN n.name",
             "columns" : ["GroupName"]
             },
+        "group-members" : {
+            "query" : "MATCH (g:Group {{name:\"{gname}\"}}) MATCH (n)-[r:MemberOf*1..]->(g) RETURN DISTINCT(n.name)",
+            "columns" : ["ObjectName"]
+        },
         "groups-full" : {
             "query": "MATCH (n),(g:Group) MATCH (n)-[r:MemberOf]->(g) RETURN g.name,n.name",
             "columns" : ["GroupName","MemberName"]
@@ -122,6 +126,9 @@ def get_info(args):
     elif (args.comp != ""):
         query = queries["adminsof"]["query"].format(comp=args.comp.upper().strip())
         cols = queries["adminsof"]["columns"]
+    elif (args.group != ""):
+        query = queries["group-members"]["query"].format(gname=args.group.upper().strip())
+        cols = queries["group-members"]["columns"]
 
     if args.getnote:
         query = query + ",n.notes"
@@ -298,7 +305,7 @@ def add_spns(args):
 
 def add_spw(args):
 
-    statement = "MATCH (n {{name:\"{name1}\"}}),(m {{name:\"{name2}\"}}) MERGE (n)-[r1:SharesPasswordWith {{isacl: false}}]->(m) MERGE (m)-[r2:SharesPasswordWith {{isacl: false}}]->(n) return n,m"
+    statement = "MATCH (n {{name:\"{name1}\"}}),(m {{name:\"{name2}\"}}) MERGE (n)-[r1:SharesPasswordWith]->(m) MERGE (m)-[r2:SharesPasswordWith]->(n) return n,m"
 
     objs = open(args.filename,'r').readlines()
 
@@ -387,6 +394,7 @@ def main():
     getinfo_switch.add_argument("--users",dest="users",default=False,action="store_true",help="Return a list of all domain users")
     getinfo_switch.add_argument("--comps",dest="comps",default=False,action="store_true",help="Return a list of all domain computers")
     getinfo_switch.add_argument("--groups",dest="groups",default=False,action="store_true",help="Return a list of all domain groups")
+    getinfo_switch.add_argument("--group-members",dest="group",default="",help="Return a list of all members of an input GROUP")
     getinfo_switch.add_argument("--groups-full",dest="groupsfull",default=False,action="store_true",help="Return a list of all domain groups with all respective group members")
     getinfo_switch.add_argument("--das",dest="das",default=False,action="store_true",help="Return a list of all Domain Admins")
     getinfo_switch.add_argument("--unconst",dest="unconstrained",default=False,action="store_true",help="Return a list of all objects configured with Unconstrained Delegation")

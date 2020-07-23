@@ -43,6 +43,11 @@ USER02@DOMAIN.LOCAL
 ...
 ```
 
+Get list of objects in a target group
+```
+python3 max.py get-info --group-members "domain controllers@domain.local"
+```
+
 Get a list of computers that a user has administrative rights to
 ```
 python3 max.py get-info --adminto USER01@DOMAIN.LOCAL
@@ -86,26 +91,27 @@ There are 8 modules: `get-info`, `mark-owned`, `mark-hvt`, `query`, `del-edge`, 
 Basic module to extract information from the database with easy output to a bash-flow workspace
 
 ```
-python3 max.py get-info -h
-usage: max.py get-info [-h] (--users | --comps | --groups | --groups-full | --das | --unconst | --npusers | --adminto UNAME | --adminsof COMP | --owned | --hvt | --desc | --admincomps) [--get-note] [-l]
+usage: max.py get-info [-h] (--users | --comps | --groups | --group-members GROUP | --groups-full | --das | --unconst | --npusers | --adminto UNAME | --adminsof COMP | --owned | --hvt | --desc | --admincomps) [--get-note] [-l]
 
 optional arguments:
-  -h, --help       show this help message and exit
-  --users          Return a list of all domain users
-  --comps          Return a list of all domain computers
-  --groups         Return a list of all domain groups
-  --groups-full    Return a list of all domain groups with all respective group members
-  --das            Return a list of all Domain Admins
-  --unconst        Return a list of all objects configured with Unconstrained Delegation
-  --npusers        Return a list of all users that don't require Kerberos Pre-Auth (AS-REP roastable)
-  --adminto UNAME  Return a list of computers that UNAME is a local administrator to
-  --adminsof COMP  Return a list of users that are administrators to COMP
-  --owned          Return all objects that are marked as owned
-  --hvt            Return all objects that are marked as High Value Targets
-  --desc           Return all users with the description field populated (also returns description)
-  --admincomps     Return all computers with admin privileges to another computer [Comp1-AdminTo->Comp2]
-  --get-note       Return the "notes" attribute for whatever objects are returned
-  -l               Apply labels to the columns returned
+  -h, --help            show this help message and exit
+  --users               Return a list of all domain users
+  --comps               Return a list of all domain computers
+  --groups              Return a list of all domain groups
+  --group-members GROUP
+                        Return a list of all members of an input GROUP
+  --groups-full         Return a list of all domain groups with all respective group members
+  --das                 Return a list of all Domain Admins
+  --unconst             Return a list of all objects configured with Unconstrained Delegation
+  --npusers             Return a list of all users that don't require Kerberos Pre-Auth (AS-REP roastable)
+  --adminto UNAME       Return a list of computers that UNAME is a local administrator to
+  --adminsof COMP       Return a list of users that are administrators to COMP
+  --owned               Return all objects that are marked as owned
+  --hvt                 Return all objects that are marked as High Value Targets
+  --desc                Return all users with the description field populated (also returns description)
+  --admincomps          Return all computers with admin privileges to another computer [Comp1-AdminTo->Comp2]
+  --get-note            Optional, return the "notes" attribute for whatever objects are returned
+  -l                    Optional, apply labels to the columns returned
 ```
 
 Few things to note:
@@ -113,6 +119,7 @@ Few things to note:
 * `users`, `comps`, `groups`, `das`, `unconst`, `npusers`, `owned`, `hvt` all return simple lists
 * `groups-full` returns all domain groups with their respective members in the format `group@domain.local - member_node_name`
 * `desc` returns users configured with a description in the format `username@domain.local - description`
+* `group-members` returns all AD objects that are members of the input `GROUP`
 * `admincomps` returns computers that are configured with admin rights for another computer in the format `admincomp.domain.local - victimcomp.domain.local`. Useful for relay attacks
 * `adminto` returns a all computers `UNAME` is local admin to. Useful for offline cred spraying & dumps
 * `adminsof` returns a list of all the users that have administrative privileges to `COMP`
