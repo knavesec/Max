@@ -14,13 +14,28 @@ global_username = "neo4j"
 global_password = "bloodhound"
 
 
+def do_test(args):
+
+    try:
+        requests.get(args.url + global_uri)
+        return True
+    except:
+        return False
+
+
 def do_query(args, query):
 
-        data = {"statements":[{"statement":query}]}
-        headers = {'Content-type': 'application/json', 'Accept': 'application/json; charset=UTF-8'}
-        auth = HTTPBasicAuth(args.username, args.password)
+    data = {"statements":[{"statement":query}]}
+    headers = {'Content-type': 'application/json', 'Accept': 'application/json; charset=UTF-8'}
+    auth = HTTPBasicAuth(args.username, args.password)
 
-        return requests.post(args.url + global_uri, auth=auth, headers=headers, json=data)
+    r = requests.post(args.url + global_uri, auth=auth, headers=headers, json=data)
+
+    if r.status_code == 401:
+        print("Authentication error: the supplied credentials are incorrect for the Neo4j database, specify new credentials with -u & -p or hardcode your credentials at the top of the script")
+        exit()
+    else:
+        return r
 
 
 def get_info(args):
@@ -40,7 +55,7 @@ def get_info(args):
             "columns" : ["GroupName"]
             },
         "group-members" : {
-            "query" : "MATCH (g:Group {{name:\"{gname}\"}}) MATCH (n)-[r:MemberOf*1..]->(g) RETURN DISTINCT(n.name)",
+            "query" : "MATCH (g:Group {{name:\"{gname}\"}}) MATCH (n)-[r:MemberOf*1..]->(g) RETURN DISTINCT n.name",
             "columns" : ["ObjectName"]
         },
         "groups-full" : {
@@ -71,6 +86,10 @@ def get_info(args):
             "query": "MATCH (n) WHERE n.owned=true RETURN n.name",
             "columns" : ["ObjectName"]
             },
+        "owned-groups" : {
+            "query" : "MATCH (n {owned:true}) MATCH (n)-[r:MemberOf*1..]->(g:Group) RETURN DISTINCT n.name,g.name",
+            "columns" : ["ObjectName","GroupName"]
+        },
         "hvt" : {
             "query": "MATCH (n) WHERE n.highvalue=true RETURN n.name",
             "columns" : ["ObjectName"]
@@ -111,6 +130,9 @@ def get_info(args):
     elif (args.owned):
         query = queries["owned"]["query"]
         cols = queries["owned"]["columns"]
+    elif (args.ownedgroups):
+        query = queries["owned-groups"]["query"]
+        cols = queries["owned-groups"]["columns"]
     elif (args.hvt):
         query = queries["hvt"]["query"]
         cols = queries["hvt"]["columns"]
@@ -126,8 +148,8 @@ def get_info(args):
     elif (args.comp != ""):
         query = queries["adminsof"]["query"].format(comp=args.comp.upper().strip())
         cols = queries["adminsof"]["columns"]
-    elif (args.group != ""):
-        query = queries["group-members"]["query"].format(gname=args.group.upper().strip())
+    elif (args.groupmems != ""):
+        query = queries["group-members"]["query"].format(gname=args.groupmems.upper().strip())
         cols = queries["group-members"]["columns"]
 
     if args.getnote:
@@ -136,6 +158,7 @@ def get_info(args):
 
     r = do_query(args, query)
     x = json.loads(r.text)
+    #print(r.text)
     entry_list = x["results"][0]["data"]
 
     if args.label:
@@ -332,6 +355,7 @@ def pet_max():
     messages = [
         "Max is a good boy",
         "Woof!",
+        "Bark!",
         "Bloodhound is great!",
         "Black Lives Matter!",
         "Remember to vote!",
@@ -387,14 +411,14 @@ def main():
     deleteedge = switch.add_parser("del-edge",help="Remove every edge of a certain type. Why filter when you can delete? (Warning, irreversible)")
     addspns = switch.add_parser("add-spns",help="Create 'HasSPNConfigured' relationships with targets from a file or stored BloodHound data. Adds possible path of compromise edge via cleartext service account credentials stored within LSA Secrets")
     addspw = switch.add_parser("add-spw",help="Create 'SharesPasswordWith' relationships with targets from a file. Adds edge indicating two objects share a password (repeated local administrator)")
-    petmax = switch.add_parser("pet-max",help="Pet max, hes a good boy")
+    petmax = switch.add_parser("pet-max",help="Pet max, hes a good boy (pet me again, I say different things)")
 
     # GETINFO function parameters
     getinfo_switch = getinfo.add_mutually_exclusive_group(required=True)
     getinfo_switch.add_argument("--users",dest="users",default=False,action="store_true",help="Return a list of all domain users")
     getinfo_switch.add_argument("--comps",dest="comps",default=False,action="store_true",help="Return a list of all domain computers")
     getinfo_switch.add_argument("--groups",dest="groups",default=False,action="store_true",help="Return a list of all domain groups")
-    getinfo_switch.add_argument("--group-members",dest="group",default="",help="Return a list of all members of an input GROUP")
+    getinfo_switch.add_argument("--group-members",dest="groupmems",default="",help="Return a list of all members of an input GROUP")
     getinfo_switch.add_argument("--groups-full",dest="groupsfull",default=False,action="store_true",help="Return a list of all domain groups with all respective group members")
     getinfo_switch.add_argument("--das",dest="das",default=False,action="store_true",help="Return a list of all Domain Admins")
     getinfo_switch.add_argument("--unconst",dest="unconstrained",default=False,action="store_true",help="Return a list of all objects configured with Unconstrained Delegation")
@@ -402,6 +426,7 @@ def main():
     getinfo_switch.add_argument("--adminto",dest="uname",default="",help="Return a list of computers that UNAME is a local administrator to")
     getinfo_switch.add_argument("--adminsof",dest="comp",default="",help="Return a list of users that are administrators to COMP")
     getinfo_switch.add_argument("--owned",dest="owned",default=False,action="store_true",help="Return all objects that are marked as owned")
+    getinfo_switch.add_argument("--owned-groups",dest="ownedgroups",default=False,action="store_true",help="Return groups of all owned objects")
     getinfo_switch.add_argument("--hvt",dest="hvt",default=False,action="store_true",help="Return all objects that are marked as High Value Targets")
     getinfo_switch.add_argument("--desc",dest="desc",default=False,action="store_true",help="Return all users with the description field populated (also returns description)")
     getinfo_switch.add_argument("--admincomps",dest="admincomps",default=False,action="store_true",help="Return all computers with admin privileges to another computer [Comp1-AdminTo->Comp2]")
@@ -436,6 +461,10 @@ def main():
 
     args = parser.parse_args()
 
+
+    if not do_test(args):
+        print("Connection error: restart Neo4j console or verify the the following URL is available: http://127.0.0.1:7474")
+        exit()
 
     if args.command == "get-info":
         get_info(args)
