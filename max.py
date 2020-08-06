@@ -1,3 +1,5 @@
+#!/usr/bin/python3
+
 import requests
 from requests.auth import HTTPBasicAuth
 import sys
@@ -43,64 +45,68 @@ def get_info(args):
     # key : {query: "", columns: []}
     queries = {
         "users" : {
-            "query": "MATCH (n:User) RETURN n.name",
+            "query" : "MATCH (n:User) RETURN n.name",
             "columns" : ["UserName"]
             },
         "comps" : {
-            "query": "MATCH (n:Computer) RETURN n.name",
+            "query" : "MATCH (n:Computer) RETURN n.name",
             "columns" : ["ComputerName"]
             },
         "groups" : {
-            "query": "MATCH (n:Group) RETURN n.name",
+            "query" : "MATCH (n:Group) RETURN n.name",
             "columns" : ["GroupName"]
             },
         "group-members" : {
             "query" : "MATCH (g:Group {{name:\"{gname}\"}}) MATCH (n)-[r:MemberOf*1..]->(g) RETURN DISTINCT n.name",
             "columns" : ["ObjectName"]
-        },
+            },
         "groups-full" : {
-            "query": "MATCH (n),(g:Group) MATCH (n)-[r:MemberOf]->(g) RETURN g.name,n.name",
+            "query" : "MATCH (n),(g:Group) MATCH (n)-[r:MemberOf]->(g) RETURN g.name,n.name",
             "columns" : ["GroupName","MemberName"]
-        },
+            },
         "das" : {
-            "query": "MATCH p =(n:User)-[r:MemberOf*1..]->(g:Group) WHERE g.name=~'DOMAIN ADMINS@.*' RETURN n.name",
+            "query" : "MATCH p =(n:User)-[r:MemberOf*1..]->(g:Group) WHERE g.name=~'DOMAIN ADMINS@.*' RETURN n.name",
             "columns" : ["UserName"]
             },
         "unconstrained" : {
-            "query": "MATCH (n) WHERE n.unconstraineddelegation=TRUE RETURN n.name",
+            "query" : "MATCH (n) WHERE n.unconstraineddelegation=TRUE RETURN n.name",
             "columns" : ["ObjectName"]
             },
         "nopreauth" : {
-            "query": "MATCH (n:User) WHERE n.dontreqpreauth=TRUE RETURN n.name",
+            "query" : "MATCH (n:User) WHERE n.dontreqpreauth=TRUE RETURN n.name",
             "columns" : ["UserName"]
             },
         "localadmin" : {
-            "query": "MATCH p=shortestPath((m:User {{name:\"{uname}\"}})-[r:AdminTo|MemberOf*1..]->(n:Computer)) RETURN n.name",
+            "query" : "MATCH p=shortestPath((m {{name:\"{uname}\"}})-[r:AdminTo|MemberOf*1..]->(n:Computer)) RETURN n.name",
             "columns" : ["ComputerName"]
             },
         "adminsof" : {
-            "query": "MATCH p=shortestPath((m:Computer {{name:\"{comp}\"}})<-[r:AdminTo|MemberOf*1..]-(n:User)) RETURN n.name",
+            "query" : "MATCH p=shortestPath((m:Computer {{name:\"{comp}\"}})<-[r:AdminTo|MemberOf*1..]-(n)) RETURN n.name",
             "columns" : ["UserName"]
             },
         "owned" : {
-            "query": "MATCH (n) WHERE n.owned=true RETURN n.name",
+            "query" : "MATCH (n) WHERE n.owned=true RETURN n.name",
             "columns" : ["ObjectName"]
             },
         "owned-groups" : {
             "query" : "MATCH (n {owned:true}) MATCH (n)-[r:MemberOf*1..]->(g:Group) RETURN DISTINCT n.name,g.name",
             "columns" : ["ObjectName","GroupName"]
-        },
+            },
         "hvt" : {
-            "query": "MATCH (n) WHERE n.highvalue=true RETURN n.name",
+            "query" : "MATCH (n) WHERE n.highvalue=true RETURN n.name",
             "columns" : ["ObjectName"]
             },
         "desc" : {
-            "query": "MATCH (n:User) WHERE n.description IS NOT NULL RETURN n.name,n.description",
+            "query" : "MATCH (n:User) WHERE n.description IS NOT NULL RETURN n.name,n.description",
             "columns" : ["UserName","Description"]
             },
         "admincomps" : {
-            "query": "MATCH (n:Computer),(m:Computer) MATCH (n)-[r:MemberOf|AdminTo*1..]->(m) return n.name,m.name",
-            "columns" : ["AdminCompName","CompName"]
+            "query" : "MATCH (n:Computer),(m:Computer) MATCH (n)-[r:MemberOf|AdminTo*1..]->(m) return n.name,m.name",
+            "columns" : ["AdminComputerName","CompterName"]
+            },
+        "nolaps" : {
+            "query" : "MATCH (c:Computer {haslaps:false}) RETURN c.name",
+            "columns" : ["ComputerName"]
             }
     }
 
@@ -142,6 +148,9 @@ def get_info(args):
     elif (args.admincomps):
         query = queries["admincomps"]["query"]
         cols = queries["admincomps"]["columns"]
+    elif (args.nolaps):
+        query = queries["nolaps"]["query"]
+        cols = queries["nolaps"]["columns"]
     elif (args.uname != ""):
         query = queries["localadmin"]["query"].format(uname=args.uname.upper().strip())
         cols = queries["localadmin"]["columns"]
@@ -158,7 +167,7 @@ def get_info(args):
 
     r = do_query(args, query)
     x = json.loads(r.text)
-    #print(r.text)
+    print(r.text)
     entry_list = x["results"][0]["data"]
 
     if args.label:
@@ -171,7 +180,6 @@ def get_info(args):
                 pass
             else:
                 print(" - ".join(map(str,value["row"])))
-
 
 
 def mark_owned(args):
@@ -265,8 +273,6 @@ def delete_edge(args):
 
 def add_spns(args):
 
-#### relationships created tally
-
     statement = "MATCH (n:User {{name:\"{uname}\"}}) MATCH (m:Computer {{name:\"{comp}\"}}) MERGE (m)-[r:HasSPNConfigured {{isacl: false}}]->(n) return n,m"
     # [ [computer, user], ... ]
     objects = []
@@ -278,7 +284,7 @@ def add_spns(args):
 
     elif args.ifilename != "":
         lines = open(args.ifilename).readlines()
-        lines = lines[4:]
+        lines = lines[4:] # trim first 4 output lines
         spns = []
         i = 0
         while lines[i].strip() != '':
@@ -421,6 +427,7 @@ def main():
     getinfo_switch.add_argument("--group-members",dest="groupmems",default="",help="Return a list of all members of an input GROUP")
     getinfo_switch.add_argument("--groups-full",dest="groupsfull",default=False,action="store_true",help="Return a list of all domain groups with all respective group members")
     getinfo_switch.add_argument("--das",dest="das",default=False,action="store_true",help="Return a list of all Domain Admins")
+    getinfo_switch.add_argument("--nolaps",dest="nolaps",default=False,action="store_true",help="Return a list of all computers without LAPS")
     getinfo_switch.add_argument("--unconst",dest="unconstrained",default=False,action="store_true",help="Return a list of all objects configured with Unconstrained Delegation")
     getinfo_switch.add_argument("--npusers",dest="nopreauth",default=False,action="store_true",help="Return a list of all users that don't require Kerberos Pre-Auth (AS-REP roastable)")
     getinfo_switch.add_argument("--adminto",dest="uname",default="",help="Return a list of computers that UNAME is a local administrator to")
