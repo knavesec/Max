@@ -65,8 +65,12 @@ def get_info(args):
             "columns" : ["GroupName","MemberName"]
             },
         "das" : {
-            "query" : "MATCH p =(n:User)-[r:MemberOf*1..]->(g:Group) WHERE g.name=~'DOMAIN ADMINS@.*' RETURN n.name",
+            "query" : "MATCH p=(n:User)-[r:MemberOf*1..]->(g:Group) WHERE g.name=~'DOMAIN ADMINS@.*' RETURN n.name",
             "columns" : ["UserName"]
+            },
+        "dasess" : {
+            "query" : "MATCH (u:User)-[r:MemberOf*1..]->(g:Group) WHERE g.objectid ENDS WITH \"-512\" WITH COLLECT(u) AS das MATCH (u2:User)<-[r2:HasSession]-(c:Computer) WHERE u2 IN das RETURN u2.name,c.name ORDER BY u2.name",
+            "columns" : ["UserName","ComputerName"]
             },
         "unconstrained" : {
             "query" : "MATCH (n) WHERE n.unconstraineddelegation=TRUE RETURN n.name",
@@ -127,6 +131,9 @@ def get_info(args):
     elif (args.das):
         query = queries["das"]["query"]
         cols = queries["das"]["columns"]
+    elif (args.dasess):
+        query = queries["dasess"]["query"]
+        cols = queries["dasess"]["columns"]
     elif (args.unconstrained):
         query = queries["unconstrained"]["query"]
         cols = queries["unconstrained"]["columns"]
@@ -167,7 +174,7 @@ def get_info(args):
 
     r = do_query(args, query)
     x = json.loads(r.text)
-    print(r.text)
+    #print(r.text)
     entry_list = x["results"][0]["data"]
 
     if args.label:
@@ -427,6 +434,7 @@ def main():
     getinfo_switch.add_argument("--group-members",dest="groupmems",default="",help="Return a list of all members of an input GROUP")
     getinfo_switch.add_argument("--groups-full",dest="groupsfull",default=False,action="store_true",help="Return a list of all domain groups with all respective group members")
     getinfo_switch.add_argument("--das",dest="das",default=False,action="store_true",help="Return a list of all Domain Admins")
+    getinfo_switch.add_argument("--da-sess",dest="dasess",default=False,action="store_true",help="Return a list of Domain Admin sessions")
     getinfo_switch.add_argument("--nolaps",dest="nolaps",default=False,action="store_true",help="Return a list of all computers without LAPS")
     getinfo_switch.add_argument("--unconst",dest="unconstrained",default=False,action="store_true",help="Return a list of all objects configured with Unconstrained Delegation")
     getinfo_switch.add_argument("--npusers",dest="nopreauth",default=False,action="store_true",help="Return a list of all users that don't require Kerberos Pre-Auth (AS-REP roastable)")
