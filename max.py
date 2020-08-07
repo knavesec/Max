@@ -105,7 +105,7 @@ def get_info(args):
             "columns" : ["UserName","Description"]
             },
         "admincomps" : {
-            "query" : "MATCH (n:Computer),(m:Computer) MATCH (n)-[r:MemberOf|AdminTo*1..]->(m) return n.name,m.name",
+            "query" : "MATCH (n:Computer),(m:Computer) MATCH (n)-[r:MemberOf|AdminTo*1..]->(m) RETURN DISTINCT n.name,m.name",
             "columns" : ["AdminComputerName","CompterName"]
             },
         "nolaps" : {
