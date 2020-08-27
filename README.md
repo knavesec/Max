@@ -13,6 +13,8 @@ A simple suite of tools:
 
 This was released with screenshots & use-cases on the following blogs: https://whynotsecurity.com/blog/max/ & https://whynotsecurity.com/blog/max2/
 
+A new potential attack primitive was added to this tool during my research, see the `add-spns` section for full details. 
+
 ## Usage
 
 ### Installation
