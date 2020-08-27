@@ -9,8 +9,9 @@ A simple suite of tools:
 - Run a raw Cypher query and return output
 - Delete an edge from the database
 - Create HasSPNConfigured & SharesPasswordWith relationships
+- Dogsay, happiness for stressful engagements
 
-This was released with screenshots & use-cases on the following blog: https://whynotsecurity.com/blog/max/ 
+This was released with screenshots & use-cases on the following blogs: https://whynotsecurity.com/blog/max/ & https://whynotsecurity.com/blog/max2/
 
 ## Usage
 
