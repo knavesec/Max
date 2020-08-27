@@ -92,7 +92,7 @@ Basic module to extract information from the database with easy output to a bash
 
 ```
 usage: max.py get-info [-h]
-                       (--users | --comps | --groups | --group-members GROUPMEMS | --groups-full | --das | --nolaps | --unconst | --npusers | --adminto UNAME | --adminsof COMP | --owned | --owned-groups | --hvt | --desc | --admincomps)
+                       (--users | --comps | --groups | --groups-full | --group-members GROUPMEMS | --das | --dasessions | --nolaps | --unconst | --npusers | --passnotreq | --sidhist | --unsupported | --sessions UNAMESESS | --adminto UNAMEADMINTO | --adminsof COMP | --owned | --owned-groups | --hvt | --desc | --admincomps)
                        [--get-note] [-l]
 
 optional arguments:
@@ -100,33 +100,43 @@ optional arguments:
   --users               Return a list of all domain users
   --comps               Return a list of all domain computers
   --groups              Return a list of all domain groups
+  --groups-full         Return a list of all domain groups with all respective group members
   --group-members GROUPMEMS
                         Return a list of all members of an input GROUP
-  --groups-full         Return a list of all domain groups with all respective group members
   --das                 Return a list of all Domain Admins
+  --dasessions          Return a list of Domain Admin sessions
   --nolaps              Return a list of all computers without LAPS
   --unconst             Return a list of all objects configured with Unconstrained Delegation
   --npusers             Return a list of all users that don't require Kerberos Pre-Auth (AS-REP roastable)
-  --adminto UNAME       Return a list of computers that UNAME is a local administrator to
+  --passnotreq          Return a list of all users that have PasswordNotRequired flag set to true
+  --sidhist             Return a list of objects configured with SID History
+  --unsupported         Return a list of computers running an unsupported OS
+  --sessions UNAMESESS  Return a list of computers that UNAME has a session on
+  --adminto UNAMEADMINTO
+                        Return a list of computers that UNAME is a local administrator to
   --adminsof COMP       Return a list of users that are administrators to COMP
   --owned               Return all objects that are marked as owned
   --owned-groups        Return groups of all owned objects
   --hvt                 Return all objects that are marked as High Value Targets
-  --desc                Return all users with the description field populated (also returns description)
-  --admincomps          Return all computers with admin privileges to another computer [Comp1-AdminTo->Comp2], printspool + relay = pwned
+  --desc                Return all objects with the description field populated, also returns description for easy grepping
+  --admincomps          Return all computers with admin privileges to another computer [Comp1-AdminTo->Comp2]
   --get-note            Optional, return the "notes" attribute for whatever objects are returned
   -l                    Optional, apply labels to the columns returned
 ```
 
 Few things to note:
 
-* `users`, `comps`, `groups`, `das`, `unconst`, `npusers`, `owned`, `hvt`, `nolaps` all return simple lists
+* `users`, `comps`, `groups`, `das`, `unconst`, `npusers`, `passnotreq`, `owned`, `hvt`, `nolaps`, `dasessions` all return simple lists
 * `groups-full` returns all domain groups with their respective members in the format `group@domain.local - member_node_name`
 * `group-members` returns all AD objects that are members of the input `GROUP`
-* `desc` returns users configured with a description in the format `username@domain.local - description`
+* `owned-groups` returns a list of owned objects with a list of all groups they are a member of, nice for grepping and targeting
+* `desc` returns all objects configured with a description in the format `objectname - description text`
 * `admincomps` returns computers that are configured with admin rights for another computer in the format `admincomp.domain.local - victimcomp.domain.local`. Useful for printspooler + relay attacks
 * `adminto` returns a all computers `UNAME` is local admin to. Useful for offline cred spraying & dumps
 * `adminsof` returns a list of all the users that have administrative privileges to `COMP`
+* `sessions` returns a list of all computers that a user has a session on
+* `sidhist` returns a list of objects configured with SID History in the format `username - sid - foreign domain - foreign object name (if found)`
+* `unsupported` returns a list of all machines running unsupported operating systems, with the OS version
 * `get-note` returns the notes of each object, typically used with the `add-note` function in the `mark-*` modules
 * `-l` apply column labels as a header. All queries with `get-info` do not return column headers (like "UserName","ComputerName","Description",etc) by default with the query
 
@@ -244,7 +254,7 @@ Few things to note:
 * `-i` Impacket style is super simple as well, it basically takes the raw input from GetUserSPNs as a file input. No need to edit the file, just `GetUserSPNs > file.txt` -> `max add-spns -i file.txt`
 * `-f` More tedious than the previous two, but sometimes necessary. Raw file input of `Computer, User`, one per line, relationship created would be `Computer - HasSPNConfigured -> User`
 
-Query being run: ```MATCH (n:User {name:"uname"}) MATCH (m:Computer {name:"comp"}}) MERGE (m)-[r:HasSPNConfigured {isacl: false}]->(n) return n,m```
+Query being run: ```MATCH (n:User {name:"uname"}) MATCH (m:Computer {name:"comp"}}) MERGE (m)-[r:HasSPNConfigured {isacl: false}]->(n) RETURN n,m```
 
 #### Module: add-spw
 
@@ -265,11 +275,13 @@ Few things to note:
 * A bidirectional relationship will be created between every single node in that file (unless the node doesn't exist)
 * Not super practical for actual tests since you need to know in advance which objects have shared passwords, but nice for analysis to see who now has a path to DA with the relationship applied
 
-Query being run: ```MATCH (n {name:"name1"}),(m {name:"name2"}) MERGE (n)-[r1:SharesPasswordWith {isacl: false}]->(m) MERGE (m)-[r2:SharesPasswordWith {isacl: false}]->(n) return n,m```
+Query being run: ```MATCH (n {name:"name1"}),(m {name:"name2"}) MERGE (n)-[r1:SharesPasswordWith {isacl: false}]->(m) MERGE (m)-[r2:SharesPasswordWith {isacl: false}]->(n) RETURN n,m```
 
 #### Module: pet-max
 
-This one's a surprise!
+"Arguably the most important contribution to this project" - me
+
+Basically dogsay, he says things and spreads happiness.
 
 ```
 python3 max.py pet-max
@@ -290,6 +302,6 @@ computer02               <- will not be added / incorrect CLI input
 
 ## Further work
 
-I hope to include an `analyze` function to provide some sort functionality similar to PlumHound/Cypheroth. Additionally planning on an `add-relationship` style module for large scale creation of relationships within the database. Lastly, thinking about creating a Powershell version for those running Neo4j on Windows, but I'm trash at Powershell so TBD.
+I hope to include an `analyze` function to provide some sort functionality similar to PlumHound/Cypheroth. Lastly, thinking about creating a Powershell version for those running Neo4j on Windows, but I'm trash at Powershell so TBD.
 
 Any other features and improvements welcome, find me @knavesec in the BloodHoundGang Slack channel and on Twitter

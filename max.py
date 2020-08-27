@@ -6,6 +6,7 @@ import sys
 import argparse
 import json
 import random
+import re
 
 # option to hardcode URL & URI
 global_url = "http://127.0.0.1:7474"
@@ -61,15 +62,15 @@ def get_info(args):
             "columns" : ["ObjectName"]
             },
         "groups-full" : {
-            "query" : "MATCH (n),(g:Group) MATCH (n)-[r:MemberOf]->(g) RETURN g.name,n.name",
+            "query" : "MATCH (n),(g:Group) MATCH (n)-[r:MemberOf]->(g) RETURN DISTINCT g.name,n.name",
             "columns" : ["GroupName","MemberName"]
             },
         "das" : {
-            "query" : "MATCH p=(n:User)-[r:MemberOf*1..]->(g:Group) WHERE g.name=~'DOMAIN ADMINS@.*' RETURN n.name",
+            "query" : "MATCH p=(n:User)-[r:MemberOf*1..]->(g:Group) WHERE g.objectid ENDS WITH '-512' RETURN DISTINCT n.name",
             "columns" : ["UserName"]
             },
         "dasess" : {
-            "query" : "MATCH (u:User)-[r:MemberOf*1..]->(g:Group) WHERE g.objectid ENDS WITH \"-512\" WITH COLLECT(u) AS das MATCH (u2:User)<-[r2:HasSession]-(c:Computer) WHERE u2 IN das RETURN u2.name,c.name ORDER BY u2.name",
+            "query" : "MATCH (u:User)-[r:MemberOf*1..]->(g:Group) WHERE g.objectid ENDS WITH '-512' WITH COLLECT(u) AS das MATCH (u2:User)<-[r2:HasSession]-(c:Computer) WHERE u2 IN das RETURN DISTINCT u2.name,c.name ORDER BY u2.name",
             "columns" : ["UserName","ComputerName"]
             },
         "unconstrained" : {
@@ -80,12 +81,16 @@ def get_info(args):
             "query" : "MATCH (n:User) WHERE n.dontreqpreauth=TRUE RETURN n.name",
             "columns" : ["UserName"]
             },
+        "sessions" : {
+            "query" : "MATCH (m {{name:'{uname}'}})<-[r:HasSession]-(n:Computer) RETURN DISTINCT n.name",
+            "columns" : ["ComputerName"]
+            },
         "localadmin" : {
-            "query" : "MATCH p=shortestPath((m {{name:\"{uname}\"}})-[r:AdminTo|MemberOf*1..]->(n:Computer)) RETURN n.name",
+            "query" : "MATCH (m {{name:'{uname}'}})-[r:AdminTo|MemberOf*1..]->(n:Computer) RETURN DISTINCT n.name",
             "columns" : ["ComputerName"]
             },
         "adminsof" : {
-            "query" : "MATCH p=shortestPath((m:Computer {{name:\"{comp}\"}})<-[r:AdminTo|MemberOf*1..]-(n)) RETURN n.name",
+            "query" : "MATCH p=shortestPath((m:Computer {{name:'{comp}'}})<-[r:AdminTo|MemberOf*1..]-(n)) RETURN DISTINCT n.name",
             "columns" : ["UserName"]
             },
         "owned" : {
@@ -101,17 +106,29 @@ def get_info(args):
             "columns" : ["ObjectName"]
             },
         "desc" : {
-            "query" : "MATCH (n:User) WHERE n.description IS NOT NULL RETURN n.name,n.description",
-            "columns" : ["UserName","Description"]
+            "query" : "MATCH (n) WHERE n.description IS NOT NULL RETURN n.name,n.description",
+            "columns" : ["ObjectName","Description"]
             },
         "admincomps" : {
-            "query" : "MATCH (n:Computer),(m:Computer) MATCH (n)-[r:MemberOf|AdminTo*1..]->(m) RETURN DISTINCT n.name,m.name",
+            "query" : "MATCH (n:Computer),(m:Computer) MATCH (n)-[r:MemberOf|AdminTo*1..]->(m) RETURN DISTINCT n.name,m.name ORDER BY n.name",
             "columns" : ["AdminComputerName","CompterName"]
             },
         "nolaps" : {
             "query" : "MATCH (c:Computer {haslaps:false}) RETURN c.name",
             "columns" : ["ComputerName"]
-            }
+            },
+        "passnotreq" : {
+            "query" : "MATCH (u:User {passwordnotreqd:true}) RETURN u.name",
+            "columns" : ["UserName"]
+        },
+        "sidhist" : {
+            "query" : "MATCH (n) WHERE n.sidhistory<>[] UNWIND n.sidhistory AS x OPTIONAL MATCH (d:Domain) WHERE x CONTAINS d.objectid OPTIONAL MATCH (m {objectid:x}) RETURN n.name,x,d.name,m.name ORDER BY n.name",
+            "columns" : ["ObjectName","SID","DomainName","ForeignObjectName"]
+        },
+        "unsupos" : {
+            "query" : "MATCH (c:Computer) WHERE c.operatingsystem =~ '.*(2000|2003|2008|xp|vista| 7 |me).*' RETURN c.name,c.operatingsystem",
+            "columns" : ["ComputerName","OperatingSystem"]
+        }
     }
 
     query = ""
@@ -140,6 +157,15 @@ def get_info(args):
     elif (args.nopreauth):
         query = queries["nopreauth"]["query"]
         cols = queries["nopreauth"]["columns"]
+    elif (args.passnotreq):
+        query = queries["passnotreq"]["query"]
+        cols = queries["passnotreq"]["columns"]
+    elif (args.sidhist):
+        query = queries["sidhist"]["query"]
+        cols = queries["sidhist"]["columns"]
+    elif (args.unsupos):
+        query = queries["unsupos"]["query"]
+        cols = queries["unsupos"]["columns"]
     elif (args.owned):
         query = queries["owned"]["query"]
         cols = queries["owned"]["columns"]
@@ -158,8 +184,11 @@ def get_info(args):
     elif (args.nolaps):
         query = queries["nolaps"]["query"]
         cols = queries["nolaps"]["columns"]
-    elif (args.uname != ""):
-        query = queries["localadmin"]["query"].format(uname=args.uname.upper().strip())
+    elif (args.unamesess != ""):
+        query = queries["sessions"]["query"].format(uname=args.unamesess.upper().strip())
+        cols = queries["sessions"]["columns"]
+    elif (args.unameadminto != ""):
+        query = queries["localadmin"]["query"].format(uname=args.unameadminto.upper().strip())
         cols = queries["localadmin"]["columns"]
     elif (args.comp != ""):
         query = queries["adminsof"]["query"].format(comp=args.comp.upper().strip())
@@ -274,7 +303,7 @@ def delete_edge(args):
 
     query = 'MATCH p=()-[r:{edge}]->() DELETE r RETURN COUNT(DISTINCT(p))'.format(edge=args.EDGENAME)
     r = do_query(args,query)
-    number = json.loads(r.text)['results'][0]['data'][0]['row'][0]
+    number = int(json.loads(r.text)['results'][0]['data'][0]['row'][0] / 2)
     print("[+] '{edge}' edge removed from {number} object relationships".format(edge=args.EDGENAME,number=number))
 
 
@@ -287,40 +316,56 @@ def add_spns(args):
     if args.filename != "":
         lines = open(args.filename).readlines()
         for line in lines:
-            objects.append([line.split(',')[0].strip().upper(), line.split(',')[1].strip().upper()])
+            try:
+                objects.append([line.split(',')[0].strip().upper(), line.split(',')[1].strip().upper()])
+            except:
+                print("[?] Failed parse for: " + line)
 
     elif args.ifilename != "":
         lines = open(args.ifilename).readlines()
         lines = lines[4:] # trim first 4 output lines
         spns = []
         i = 0
-        while lines[i].strip() != '':
+        while (i != len(lines) and lines[i].strip() != ''):
             spns.append(list(filter(('').__ne__,lines[i].strip().split("  ")))) # impacket uses a 2 space value between items, use this split hack to get around spaces in values
             i += 1
         for line in spns:
-            spn = line[0].strip().split(":")[0].split('/')[1].upper()
-            uname = line[1].strip().upper()
-            domain = '.'.join(line[2].strip().split("DC=")[1:]).replace(',','').upper()
-            if domain not in spn:
-                spn = spn + '.' + domain
-            uname = uname + '@' + domain
-            if [spn,uname] not in objects:
-                objects.append([spn,uname])
+            try:
+                spn = line[0].split('/')[1].split(':')[0].strip().upper()
+                uname = line[1].strip().upper()
+                domain = '.'.join(line[2].strip().split("DC=")[1:]).replace(',','').upper()
+                if domain not in spn:
+                    spn = spn + '.' + domain
+                uname = uname + '@' + domain
+                if [spn,uname] not in objects:
+                    objects.append([spn,uname])
+            except:
+                print("[?] Failed parse for: " + line[0].strip() + " and " + line[1].strip())
 
     elif args.blood:
 
         statement1 = "MATCH (n:User {hasspn:true}) RETURN n.name,n.serviceprincipalnames"
         r = do_query(args,statement1)
-        spns = json.loads(r.text)['results'][0]['data']
-        for user in spns:
-            uname = user['row'][0]
-            for fullspn in user['row'][1]:
-                spn = fullspn.split(":")[0].split("/")[1].upper()
-                if [spn,uname] not in objects:
-                    objects.append([spn,uname])
+        try:
+            spns = json.loads(r.text)['results'][0]['data']
+            print("[*] BloodHound data queried successfully")
+            for user in spns:
+                uname = user['row'][0]
+                domain = uname.split("@")[1]
+                for fullspn in user['row'][1]:
+                    try:
+                        spn = fullspn.split('/')[1].split(':')[0].strip().upper()
+                        if domain not in spn:
+                            spn = spn + "." + domain
+                        if [spn,uname] not in objects:
+                            objects.append([spn,uname])
+                    except:
+                        print("[?] Failed parse for user " + uname + " and SPN " + fullspn)
+        except:
+            print("[-] Error querying database")
 
     else:
-        print("Unknown file name")
+        print("Invalid Option")
 
     count = 0
     for set in objects:
@@ -372,11 +417,11 @@ def pet_max():
         "Bloodhound is great!",
         "Black Lives Matter!",
         "Remember to vote!",
+        "Support the Postal Service!",
         "Wear a mask!",
         "Hack the planet!",
         "10/10 would pet - @blurbdust",
         "dogsay > cowsay - @b1gbroth3r"
-
     ]
 
     max = """
@@ -431,19 +476,23 @@ def main():
     getinfo_switch.add_argument("--users",dest="users",default=False,action="store_true",help="Return a list of all domain users")
     getinfo_switch.add_argument("--comps",dest="comps",default=False,action="store_true",help="Return a list of all domain computers")
     getinfo_switch.add_argument("--groups",dest="groups",default=False,action="store_true",help="Return a list of all domain groups")
-    getinfo_switch.add_argument("--group-members",dest="groupmems",default="",help="Return a list of all members of an input GROUP")
     getinfo_switch.add_argument("--groups-full",dest="groupsfull",default=False,action="store_true",help="Return a list of all domain groups with all respective group members")
+    getinfo_switch.add_argument("--group-members",dest="groupmems",default="",help="Return a list of all members of an input GROUP")
     getinfo_switch.add_argument("--das",dest="das",default=False,action="store_true",help="Return a list of all Domain Admins")
-    getinfo_switch.add_argument("--da-sess",dest="dasess",default=False,action="store_true",help="Return a list of Domain Admin sessions")
+    getinfo_switch.add_argument("--dasessions",dest="dasess",default=False,action="store_true",help="Return a list of Domain Admin sessions")
     getinfo_switch.add_argument("--nolaps",dest="nolaps",default=False,action="store_true",help="Return a list of all computers without LAPS")
     getinfo_switch.add_argument("--unconst",dest="unconstrained",default=False,action="store_true",help="Return a list of all objects configured with Unconstrained Delegation")
     getinfo_switch.add_argument("--npusers",dest="nopreauth",default=False,action="store_true",help="Return a list of all users that don't require Kerberos Pre-Auth (AS-REP roastable)")
-    getinfo_switch.add_argument("--adminto",dest="uname",default="",help="Return a list of computers that UNAME is a local administrator to")
+    getinfo_switch.add_argument("--passnotreq",dest="passnotreq",default=False,action="store_true",help="Return a list of all users that have PasswordNotRequired flag set to true")
+    getinfo_switch.add_argument("--sidhist",dest="sidhist",default=False,action="store_true",help="Return a list of objects configured with SID History")
+    getinfo_switch.add_argument("--unsupported",dest="unsupos",default=False,action="store_true",help="Return a list of computers running an unsupported OS")
+    getinfo_switch.add_argument("--sessions",dest="unamesess",default="",help="Return a list of computers that UNAME has a session on")
+    getinfo_switch.add_argument("--adminto",dest="unameadminto",default="",help="Return a list of computers that UNAME is a local administrator to")
     getinfo_switch.add_argument("--adminsof",dest="comp",default="",help="Return a list of users that are administrators to COMP")
     getinfo_switch.add_argument("--owned",dest="owned",default=False,action="store_true",help="Return all objects that are marked as owned")
     getinfo_switch.add_argument("--owned-groups",dest="ownedgroups",default=False,action="store_true",help="Return groups of all owned objects")
     getinfo_switch.add_argument("--hvt",dest="hvt",default=False,action="store_true",help="Return all objects that are marked as High Value Targets")
-    getinfo_switch.add_argument("--desc",dest="desc",default=False,action="store_true",help="Return all users with the description field populated (also returns description)")
+    getinfo_switch.add_argument("--desc",dest="desc",default=False,action="store_true",help="Return all objects with the description field populated, also returns description for easy grepping")
     getinfo_switch.add_argument("--admincomps",dest="admincomps",default=False,action="store_true",help="Return all computers with admin privileges to another computer [Comp1-AdminTo->Comp2]")
 
     getinfo.add_argument("--get-note",dest="getnote",default=False,action="store_true",help="Optional, return the \"notes\" attribute for whatever objects are returned")
@@ -471,7 +520,7 @@ def main():
     addspns_switch.add_argument("-f","--file",dest="filename",default="",help="Standard file Format: Computer, User")
     addspns_switch.add_argument("-i","--impacket",dest="ifilename",default="",help="Impacket file Format: Output of GetUserSPNs.py")
 
-    # ADDEDGE function parameters
+    # ADDSPW function parameters
     addspw.add_argument("-f","--file",dest="filename",default="",required=False,help="Filename containing AD objects, one per line (must have FQDN attached)")
 
     args = parser.parse_args()
@@ -505,7 +554,6 @@ def main():
         pet_max()
     else:
         print("Error: use a module or use -h/--help to see help")
-
 
 
 if __name__ == "__main__":
