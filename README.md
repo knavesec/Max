@@ -13,7 +13,7 @@ A simple suite of tools:
 
 This was released with screenshots & use-cases on the following blogs: https://whynotsecurity.com/blog/max/ & https://whynotsecurity.com/blog/max2/
 
-A new potential attack primitive was added to this tool during my research, see the `add-spns` section for full details. 
+A new potential attack primitive was added to this tool during my research, see the `add-spns` section for full details.
 
 ## Usage
 
@@ -243,7 +243,7 @@ Query being run: ```MATCH p=()-[r:{edge}]->() DELETE r RETURN COUNT(DISTINCT(p))
 
 #### Module: add-spns
 
-Adds the HasSPNConfigured relationship to objects in the database. This compromise path is based on the theory that service accounts store their cleartext credentials in LSA secrets and are easily retrieved with the right privileges. A Service Principal Name (SPN) identifies where service accounts are configured, and therefore may indicate that there are stored credentials in LSA secrets. This creates a relationship based on this: access to a computer could lead to the compromise of that user. In my experience it's accurate roughly 2/3s of the time, though it varies from client to client.
+Adds the HasSPNConfigured relationship to objects in the database. This compromise path is based on the theory that service accounts store their cleartext credentials in LSA secrets and are easily retrieved with the right privileges. A Service Principal Name (SPN) identifies where service accounts are configured, and therefore may indicate that there are stored credentials in LSA secrets. The function creates a relationship based on this relationship: access to a computer could lead to the compromise of that user. In my experience it's accurate roughly 2/3s of the time, though it varies from client to client.
 
 ```
 python3 max.py add-spns -h
