@@ -77,6 +77,11 @@ python3 max.py add-spns -b
 python3 max.py add-spns -i getuserspns-raw-output.txt
 ```
 
+Pet max
+```
+python3 max.py pet-max
+```
+
 ### In Depth Usage & Modules
 
 #### General
