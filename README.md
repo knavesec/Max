@@ -3,7 +3,7 @@
 ## Description
 
 A simple suite of tools:
-- Pull lists of information from the Neo4j database
+- [get-info](#get-info) - Pull lists of information from the Neo4j database
 - Mark a list of objects as Owned
 - Mark a list of objects as High Value Targets
 - Run a raw Cypher query and return output
