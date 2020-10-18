@@ -1,15 +1,17 @@
+
 # Maximizing BloodHound with a simple suite of tools
 
 ## Description
 
 A simple suite of tools:
 - [get-info](#module-get-info) - Pull lists of information from the Neo4j database
-- Mark a list of objects as Owned
-- Mark a list of objects as High Value Targets
-- Run a raw Cypher query and return output
-- Delete an edge from the database
-- Create HasSPNConfigured & SharesPasswordWith relationships
-- Dogsay, happiness for stressful engagements
+- [mark-owned](#module-mark-owned) - Mark a list of objects as Owned
+- [mark-hvt](#module-mark-hvt) - Mark a list of objects as High Value Targets
+- [query](#module-query) - Run a raw Cypher query and return output
+- [del-edge](#module-del-edge) - Delete an edge from the database
+- [add-spns](#module-add-spns) - Create HasSPNConfigured relationships
+- [add-spw](#module-add-spw) - Create SharesPasswordWith relationships
+- [pet-max](#module-pet-max) - Dogsay, happiness for stressful engagements
 
 This was released with screenshots & use-cases on the following blogs: https://whynotsecurity.com/blog/max/ & https://whynotsecurity.com/blog/max2/
 
