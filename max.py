@@ -7,6 +7,8 @@ import argparse
 import json
 import random
 import re
+from itertools import zip_longest
+import csv
 
 # option to hardcode URL & URI
 global_url = "http://127.0.0.1:7474"
@@ -15,6 +17,32 @@ global_uri = "/db/data/transaction/commit"
 # option to hardcode creds, these will be used as the username and password "defaults"
 global_username = "neo4j"
 global_password = "bloodhound"
+
+edges = [
+    "MemberOf",
+    "HasSession",
+    "AdminTo",
+    "AllExtendedRights",
+    "AddMember",
+    "ForceChangePassword",
+    "GenericAll",
+    "GenericWrite",
+    "Owns",
+    "WriteDacl",
+    "WriteOwner",
+    "ReadLAPSPassword",
+    "ReadGMSAPassword",
+    "Contains",
+    "GpLink",
+    "CanRDP",
+    "CanPSRemote",
+    "ExecuteDCOM",
+    "AllowedToDelegate",
+    "AddAllowedToAct",
+    "AllowedToAct",
+    "SQLAdmin",
+    "HasSIDHistory"
+]
 
 
 def do_test(args):
@@ -46,7 +74,7 @@ def get_info(args):
     # key : {query: "", columns: []}
     queries = {
         "users" : {
-            "query" : "MATCH (n:User) RETURN n.name",
+            "query" : "MATCH (u:User) {enabled} RETURN u.name",
             "columns" : ["UserName"]
             },
         "comps" : {
@@ -86,7 +114,7 @@ def get_info(args):
             "columns" : ["ComputerName"]
             },
         "localadmin" : {
-            "query" : "MATCH (m {{name:'{uname}'}})-[r:AdminTo|MemberOf*1..]->(n:Computer) RETURN DISTINCT n.name",
+            "query" : "MATCH (m {{name:'{uname}'}})-[r:AdminTo|MemberOf*1..4]->(n:Computer) RETURN DISTINCT n.name",
             "columns" : ["ComputerName"]
             },
         "adminsof" : {
@@ -118,7 +146,7 @@ def get_info(args):
             "columns" : ["ComputerName"]
             },
         "passnotreq" : {
-            "query" : "MATCH (u:User {passwordnotreqd:true}) RETURN u.name",
+            "query" : "MATCH (u:User {{passwordnotreqd:true}}) {enabled} RETURN u.name",
             "columns" : ["UserName"]
         },
         "sidhist" : {
@@ -200,6 +228,11 @@ def get_info(args):
     if args.getnote:
         query = query + ",n.notes"
         cols.append("Notes")
+
+    if args.enabled:
+        query = query.format(enabled="WHERE u.enabled=true")
+    else:
+        query = query.format(enabled="")
 
     r = do_query(args, query)
     x = json.loads(r.text)
@@ -297,6 +330,56 @@ def query_func(args):
             print(x['errors'][0]['message'])
         else:
             print("Uncaught error, sry")
+
+
+def export_func(args):
+
+    node_name = args.NODE_NAME.upper().strip()
+    query = "MATCH (n1 {{name:'{node_name}'}}) MATCH (n1)-[r:{edge}]->(n2) RETURN DISTINCT n2.name"
+
+    data = []
+
+    for edge in edges:
+        print("[*] Running " + edge + " collection...")
+
+        statement = query.format(node_name=node_name, edge=edge)
+
+        r = do_query(args, statement)
+        x = json.loads(r.text)
+
+        try:
+            entry_list = x["results"][0]["data"]
+
+            list = [edge]
+            for value in entry_list:
+                try:
+                    list.append(value["row"][0])
+                except:
+                    if len(value["row"]) == 1:
+                        pass
+                    else:
+                        pass
+
+            if len(list) == 1:
+                pass
+            else:
+                data.append(list)
+
+            print("[+] Completed " + edge + " collection: " + str(len(entry_list)) + " relationships found")
+
+        except:
+            if x['errors'][0]['code'] == "Neo.ClientError.Statement.SyntaxError":
+                print("Neo4j syntax error")
+                print(x['errors'][0]['message'])
+            else:
+                print("Uncaught error, sry")
+
+    export_data = zip_longest(*data, fillvalue='')
+    filename = node_name.replace(" ","_") + ".csv"
+    with open(filename,'w', encoding='utf-8', newline='') as file:
+        wr = csv.writer(file)
+        wr.writerows(export_data)
+    file.close()
 
 
 def delete_edge(args):
@@ -466,6 +549,7 @@ def main():
     markowned = switch.add_parser("mark-owned",help="Mark objects as Owned")
     markhvt = switch.add_parser("mark-hvt",help="Mark items as High Value Targets (HVTs)")
     query = switch.add_parser("query",help="Run a raw query & return results (must return node attributes like n.name or n.description)")
+    export = switch.add_parser("export",help="Export a user or groups raw privileges to a csv file")
     deleteedge = switch.add_parser("del-edge",help="Remove every edge of a certain type. Why filter when you can delete? (Warning, irreversible)")
     addspns = switch.add_parser("add-spns",help="Create 'HasSPNConfigured' relationships with targets from a file or stored BloodHound data. Adds possible path of compromise edge via cleartext service account credentials stored within LSA Secrets")
     addspw = switch.add_parser("add-spw",help="Create 'SharesPasswordWith' relationships with targets from a file. Adds edge indicating two objects share a password (repeated local administrator)")
@@ -497,6 +581,7 @@ def main():
 
     getinfo.add_argument("--get-note",dest="getnote",default=False,action="store_true",help="Optional, return the \"notes\" attribute for whatever objects are returned")
     getinfo.add_argument("-l",dest="label",action="store_true",default=False,help="Optional, apply labels to the columns returned")
+    getinfo.add_argument("-e","--enabled",dest="enabled",action="store_true",default=False,help="Optional, only return enabled domain objects (only works for flags that return users)")
 
     # MARKOWNED function paramters
     markowned.add_argument("-f","--file",dest="filename",default="",required=False,help="Filename containing AD objects (must have FQDN attached)")
@@ -510,6 +595,9 @@ def main():
 
     # QUERY function arguments
     query.add_argument("QUERY",help="Query designation")
+
+    # EXPORT function parameters
+    export.add_argument("NODE_NAME",help="Full name of node to extract info about (UNAME@DOMAIN/COMP.DOMAIN)")
 
     # DELETEEDGE function parameters
     deleteedge.add_argument("EDGENAME",help="Edge name, example: CanRDP, ExecuteDCOM, etc")
@@ -544,6 +632,8 @@ def main():
             mark_hvt(args)
     elif args.command == "query":
         query_func(args)
+    elif args.command == "export":
+        export_func(args)
     elif args.command == "del-edge":
         delete_edge(args)
     elif args.command == "add-spns":

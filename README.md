@@ -44,6 +44,7 @@ python3 max.py mark-owned -f owned.txt --add-note "Owned by repeated local admin
 Get list of users
 ```
 python3 max.py get-info --users
+python3 max.py get-info --users --enabled
 
 USER01@DOMAIN.LOCAL
 USER02@DOMAIN.LOCAL
@@ -105,7 +106,7 @@ Basic module to extract information from the database with easy output to a bash
 ```
 usage: max.py get-info [-h]
                        (--users | --comps | --groups | --groups-full | --group-members GROUPMEMS | --das | --dasessions | --nolaps | --unconst | --npusers | --passnotreq | --sidhist | --unsupported | --sessions UNAMESESS | --adminto UNAMEADMINTO | --adminsof COMP | --owned | --owned-groups | --hvt | --desc | --admincomps)
-                       [--get-note] [-l]
+                       [--get-note] [-l] [-e]
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -134,6 +135,7 @@ optional arguments:
   --admincomps          Return all computers with admin privileges to another computer [Comp1-AdminTo->Comp2]
   --get-note            Optional, return the "notes" attribute for whatever objects are returned
   -l                    Optional, apply labels to the columns returned
+  -e, --enabled         Optional, only return enabled domain objects (only works for flags that return users)
 ```
 
 Few things to note:
