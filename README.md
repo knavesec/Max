@@ -9,7 +9,7 @@ A simple suite of tools:
 - [mark-hvt](#module-mark-hvt) - Mark a list of objects as High Value Targets
 - [query](#module-query) - Run a raw Cypher query and return output
 - [del-edge](#module-del-edge) - Delete an edge from the database
-- [add-spns](#module-add-spns) - Create HasSPNConfigured relationships
+- [add-spns](#module-add-spns) - Create HasSPNConfigured relationships, new attack primitive
 - [add-spw](#module-add-spw) - Create SharesPasswordWith relationships
 - [pet-max](#module-pet-max) - Dogsay, happiness for stressful engagements
 

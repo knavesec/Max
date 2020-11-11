@@ -491,6 +491,11 @@ def add_spw(args):
     print("SharesPasswordWith relationships created: " + str(count))
 
 
+def dpat(args):
+
+    print("DPAT Function")
+
+
 def pet_max():
 
     messages = [
@@ -499,8 +504,6 @@ def pet_max():
         "Bark!",
         "Bloodhound is great!",
         "Black Lives Matter!",
-        "Remember to vote!",
-        "Support the Postal Service!",
         "Wear a mask!",
         "Hack the planet!",
         "10/10 would pet - @blurbdust",
@@ -553,6 +556,7 @@ def main():
     deleteedge = switch.add_parser("del-edge",help="Remove every edge of a certain type. Why filter when you can delete? (Warning, irreversible)")
     addspns = switch.add_parser("add-spns",help="Create 'HasSPNConfigured' relationships with targets from a file or stored BloodHound data. Adds possible path of compromise edge via cleartext service account credentials stored within LSA Secrets")
     addspw = switch.add_parser("add-spw",help="Create 'SharesPasswordWith' relationships with targets from a file. Adds edge indicating two objects share a password (repeated local administrator)")
+    dpat = switch.add_parser("dpat",help="Based off Domain Password Audit Tool, run cracked user-password analysis tied with BloodHound through a Hashcat potfile & NTDS")
     petmax = switch.add_parser("pet-max",help="Pet max, hes a good boy (pet me again, I say different things)")
 
     # GETINFO function parameters
@@ -581,7 +585,7 @@ def main():
 
     getinfo.add_argument("--get-note",dest="getnote",default=False,action="store_true",help="Optional, return the \"notes\" attribute for whatever objects are returned")
     getinfo.add_argument("-l",dest="label",action="store_true",default=False,help="Optional, apply labels to the columns returned")
-    getinfo.add_argument("-e","--enabled",dest="enabled",action="store_true",default=False,help="Optional, only return enabled domain objects (only works for flags that return users)")
+    getinfo.add_argument("-e","--enabled",dest="enabled",action="store_true",default=False,help="Optional, only return enabled domain users (only works for --users and --passnotreq flags as of now)")
 
     # MARKOWNED function paramters
     markowned.add_argument("-f","--file",dest="filename",default="",required=False,help="Filename containing AD objects (must have FQDN attached)")
@@ -598,6 +602,7 @@ def main():
 
     # EXPORT function parameters
     export.add_argument("NODE_NAME",help="Full name of node to extract info about (UNAME@DOMAIN/COMP.DOMAIN)")
+    export.add_argument("-t","--transitive",dest="transitive",action="store_true",help="Incorporate rights granted through nested groups (beta)")
 
     # DELETEEDGE function parameters
     deleteedge.add_argument("EDGENAME",help="Edge name, example: CanRDP, ExecuteDCOM, etc")
@@ -609,7 +614,12 @@ def main():
     addspns_switch.add_argument("-i","--impacket",dest="ifilename",default="",help="Impacket file Format: Output of GetUserSPNs.py")
 
     # ADDSPW function parameters
-    addspw.add_argument("-f","--file",dest="filename",default="",required=False,help="Filename containing AD objects, one per line (must have FQDN attached)")
+    addspw.add_argument("-f","--file",dest="filename",default="",required=True,help="Filename containing AD objects, one per line (must have FQDN attached)")
+
+    # DPAT function parameters
+    dpat.add_argument("-n","--ntds",dest="ntdsfile",default="",required=True,help="NTDS file name")
+    dpat.add_argument("-p","--pot",dest="potfile",default="",required=True,help="Hashcat potfile")
+    dpat.add_argument("-s","--sanitize",dest="sanitize",action="store_true",required=False,help="Sanitize the report by partially redacting passwords and hashes")
 
     args = parser.parse_args()
 
@@ -640,6 +650,8 @@ def main():
         add_spns(args)
     elif args.command == "add-spw":
         add_spw(args)
+    elif args.command == "dpat":
+        dpat(args)
     elif args.command == "pet-max":
         pet_max()
     else:
