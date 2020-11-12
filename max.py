@@ -498,31 +498,31 @@ def dpat_func(args):
     # for line in ntds:
     #
     #
-    #
-    #
-    # #     if ":::" not in line:
-    # #         continue
-    # #     full_user = line.split(":")[0]
-    # #     try:
-    # #         user = full_user.split('\\')[1]
-    # #         domain = full_user.split('\\')[0]
-    # #     except:
-    # #         print(full_user)
-    #
-    #
-    # full_user = line.split(":")[0]
-    # user = full_user.split('\\')[1]
-    # domain = full_user.split('\\')[0]
-    # rid = line.split(":")[1]
-    # username = user + "@" + domain
-    #
-    # query1 = "match (u:User) where u.name='{username}' return u.name,u.objectid".format(username=username)
-    # query2 = "match (u:User) where u.name starts with '{username}@' and u.objectid ends with '-{rid}' return u.name,u.objectid".format(username=user, rid=rid)
-    #
-    # do_query()
 
 
-    print("As")
+    #     if ":::" not in line:
+    #         continue
+    #     full_user = line.split(":")[0]
+    #     try:
+    #         user = full_user.split('\\')[1]
+    #         domain = full_user.split('\\')[0]
+    #     except:
+    #         print(full_user)
+
+
+    full_user = line.split(":")[0]
+    user = full_user.split('\\')[1]
+    domain = full_user.split('\\')[0]
+    rid = line.split(":")[1]
+    username = user + "@" + domain
+
+    query1 = "match (u:User) where u.name='{username}' return u.name,u.objectid".format(username=username)
+    query2 = "match (u:User) where u.name starts with '{username}@' and u.objectid ends with '-{rid}' return u.name,u.objectid".format(username=user, rid=rid)
+
+    do_query()
+
+
+
     # for user in ntds:
     #
     #     only pull out users that were "cracked"
