@@ -491,9 +491,64 @@ def add_spw(args):
     print("SharesPasswordWith relationships created: " + str(count))
 
 
-def dpat(args):
+def dpat_func(args):
 
-    print("DPAT Function")
+    ntds = open(args.ntdsfile,'r').readlines()
+    pot = open(args.potfile,'r').readlines()
+    for line in ntds:
+
+
+
+
+    #     if ":::" not in line:
+    #         continue
+    #     full_user = line.split(":")[0]
+    #     try:
+    #         user = full_user.split('\\')[1]
+    #         domain = full_user.split('\\')[0]
+    #     except:
+    #         print(full_user)
+
+
+    full_user = line.split(":")[0]
+    user = full_user.split('\\')[1]
+    domain = full_user.split('\\')[0]
+    rid = line.split(":")[1]
+    username = user + "@" + domain
+
+    query1 = "match (u:User) where u.name='{username}' return u.name,u.objectid".format(username=username)
+    query2 = "match (u:User) where u.name starts with '{username}@' and u.objectid ends with '-{rid}' return u.name,u.objectid".format(username=user, rid=rid)
+
+    do_query()
+
+
+
+    # for user in ntds:
+    #
+    #     only pull out users that were "cracked"
+    #
+    # for user in cracked list:
+    #
+    #     need to figure out how to sort between local users/computer objects/users without speified "domain"
+    #     need an exception for "Administrator" user
+    #     can have a domain user that is just user1:rid:hash:hash, but has entry in BH. Adminsitrator has the local user and the domain one, so need edge case
+    #
+    #
+    #     get username and domain, search specifically in BH
+    #     if not found:
+    #         get username and rid
+    #         search through BH
+    #         if found:
+    #             add user/ID to array
+    #         else:
+    #             skip and note as "not found"
+    #
+    #
+    # querylist = [
+    #
+    # ]
+
+
 
 
 def pet_max():
@@ -625,7 +680,7 @@ def main():
 
 
     if not do_test(args):
-        print("Connection error: restart Neo4j console or verify the the following URL is available: http://127.0.0.1:7474")
+        print("Connection error: restart Neo4j console or verify the the following URL is available: {}".format(args.url))
         exit()
 
     if args.command == "get-info":
@@ -651,7 +706,7 @@ def main():
     elif args.command == "add-spw":
         add_spw(args)
     elif args.command == "dpat":
-        dpat(args)
+        dpat_func(args)
     elif args.command == "pet-max":
         pet_max()
     else:
