@@ -115,7 +115,7 @@ optional arguments:
   --groups              Return a list of all domain groups
   --groups-full         Return a list of all domain groups with all respective group members
   --group-members GROUPMEMS
-                        Return a list of all members of an input GROUP
+                        Return a list of all members of an input GROUP@DOMAIN.LOCAL
   --das                 Return a list of all Domain Admins
   --dasessions          Return a list of Domain Admin sessions
   --nolaps              Return a list of all computers without LAPS
@@ -124,10 +124,10 @@ optional arguments:
   --passnotreq          Return a list of all users that have PasswordNotRequired flag set to true
   --sidhist             Return a list of objects configured with SID History
   --unsupported         Return a list of computers running an unsupported OS
-  --sessions UNAMESESS  Return a list of computers that UNAME has a session on
+  --sessions UNAMESESS  Return a list of computers that UNAME@DOMAIN.LOCAL has a session on
   --adminto UNAMEADMINTO
-                        Return a list of computers that UNAME is a local administrator to
-  --adminsof COMP       Return a list of users that are administrators to COMP
+                        Return a list of computers that UNAME@DOMAIN.LOCAL is a local administrator to
+  --adminsof COMP       Return a list of users that are administrators to COMP.DOMAIN.LOCAL
   --owned               Return all objects that are marked as owned
   --owned-groups        Return groups of all owned objects
   --hvt                 Return all objects that are marked as High Value Targets
@@ -142,13 +142,13 @@ Few things to note:
 
 * `users`, `comps`, `groups`, `das`, `unconst`, `npusers`, `passnotreq`, `owned`, `hvt`, `nolaps`, `dasessions` all return simple lists
 * `groups-full` returns all domain groups with their respective members in the format `group@domain.local - member_node_name`
-* `group-members` returns all AD objects that are members of the input `GROUP`
+* `group-members` returns all AD objects that are members of the input `GROUP@DOMAIN.LOCAL`
 * `owned-groups` returns a list of owned objects with a list of all groups they are a member of, nice for grepping and targeting
 * `desc` returns all objects configured with a description in the format `objectname - description text`
 * `admincomps` returns computers that are configured with admin rights for another computer in the format `admincomp.domain.local - victimcomp.domain.local`. Useful for printspooler + relay attacks
-* `adminto` returns a all computers `UNAME` is local admin to. Useful for offline cred spraying & dumps
-* `adminsof` returns a list of all the users that have administrative privileges to `COMP`
-* `sessions` returns a list of all computers that a user has a session on
+* `adminto` returns a all computers `UNAME@DOMAIN.LOCAL` is local admin to. Useful for offline cred spraying & dumps
+* `adminsof` returns a list of all the users that have administrative privileges to `COMP.DOMAIN.LOCAL`
+* `sessions` returns a list of all computers that user `UNAME@DOMAIN.LOCAL` has a session on
 * `sidhist` returns a list of objects configured with SID History in the format `username - sid - foreign domain - foreign object name (if found)`
 * `unsupported` returns a list of all machines running unsupported operating systems, with the OS version
 * `get-note` returns the notes of each object, typically used with the `add-note` function in the `mark-*` modules
