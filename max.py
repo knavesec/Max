@@ -531,6 +531,9 @@ def dpat_func(args):
             to_append = []
             if (line.split(":")[0].split("\\")[0] == line.split(":")[0]):
                 # no domain found, local account
+                if (line.split(":")[0][-1:] == "$"):
+                    # computer account, skip
+                    continue 
                 to_append.append(line.split(":")[0])
                 to_append.append("")
             else:
