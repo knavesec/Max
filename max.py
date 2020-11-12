@@ -524,6 +524,9 @@ def dpat_func(args):
     try:
         ntds_parsed = []
         for line in ntds:
+            line = line.replace("\r", "").replace("\n", "")
+            if (line == ""):
+                continue
             # [ username, domain, rid, LM, NT, plaintext||None]
             to_append = []
             if (line.split(":")[0].split("\\")[0] == line.split(":")[0]):
@@ -564,8 +567,11 @@ def dpat_func(args):
             for user in ntds_parsed:
                 # [ username, domain, rid, LM, NT, plaintext||None]
                 # try query1 to see if we can resolve the users 
-                query1 = "match (u:User) where u.name='{username}' return u.name,u.objectid".format(username=user[0])
-                r = do_query(args,query1)
+                if (user[1] != ""):
+                    query = "match (u:User) where u.name='{username}' return u.name,u.objectid".format(username=str(user[0].upper() + "@" + user[1].upper()))
+                else:
+                    query = "match (u:User) where u.name starts with '{username}@' and u.objectid ends with '-{rid}' return u.name,u.objectid".format(username=user[0].upper(), rid=user[2].upper())
+                r = do_query(args,query)
                 bh_users = json.loads(r.text)['results'][0]['data']
                 print("[*] BloodHound data queried successfully")
                 for bh_user in bh_users:
@@ -580,7 +586,7 @@ def dpat_func(args):
         print(cracked)
     except Exception as e:
         print("Got error:")
-        print(e)
+        print(e.print_exc())
         return
 
 def pet_max():
