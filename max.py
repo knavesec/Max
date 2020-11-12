@@ -18,32 +18,6 @@ global_uri = "/db/data/transaction/commit"
 global_username = "neo4j"
 global_password = "bloodhound"
 
-edges = [
-    "MemberOf",
-    "HasSession",
-    "AdminTo",
-    "AllExtendedRights",
-    "AddMember",
-    "ForceChangePassword",
-    "GenericAll",
-    "GenericWrite",
-    "Owns",
-    "WriteDacl",
-    "WriteOwner",
-    "ReadLAPSPassword",
-    "ReadGMSAPassword",
-    "Contains",
-    "GpLink",
-    "CanRDP",
-    "CanPSRemote",
-    "ExecuteDCOM",
-    "AllowedToDelegate",
-    "AddAllowedToAct",
-    "AllowedToAct",
-    "SQLAdmin",
-    "HasSIDHistory"
-]
-
 
 def do_test(args):
 
@@ -229,10 +203,12 @@ def get_info(args):
         query = query + ",n.notes"
         cols.append("Notes")
 
-    if args.enabled:
+    if args.enabled and "{enabled}" in query:
         query = query.format(enabled="WHERE u.enabled=true")
-    else:
+    elif "{enabled}" in query:
         query = query.format(enabled="")
+    else:
+        pass
 
     r = do_query(args, query)
     x = json.loads(r.text)
@@ -333,6 +309,34 @@ def query_func(args):
 
 
 def export_func(args):
+
+    edges = [
+        "MemberOf",
+        "HasSession",
+        "AdminTo",
+        "AllExtendedRights",
+        "AddMember",
+        "ForceChangePassword",
+        "GenericAll",
+        "GenericWrite",
+        "Owns",
+        "WriteDacl",
+        "WriteOwner",
+        "ReadLAPSPassword",
+        "ReadGMSAPassword",
+        "Contains",
+        "GpLink",
+        "CanRDP",
+        "CanPSRemote",
+        "ExecuteDCOM",
+        "AllowedToDelegate",
+        "AddAllowedToAct",
+        "AllowedToAct",
+        "SQLAdmin",
+        "HasSIDHistory",
+        "HasSPNConfigured",
+        "SharesPasswordWith"
+    ]
 
     node_name = args.NODE_NAME.upper().strip()
     query = "MATCH (n1 {{name:'{node_name}'}}) MATCH (n1)-[r:{edge}]->(n2) RETURN DISTINCT n2.name"
