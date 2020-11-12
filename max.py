@@ -229,10 +229,12 @@ def get_info(args):
         query = query + ",n.notes"
         cols.append("Notes")
 
-    if args.enabled:
+    if args.enabled and "{enabled}" in query:
         query = query.format(enabled="WHERE u.enabled=true")
-    else:
+    elif "{enabled}" in query:
         query = query.format(enabled="")
+    else:
+        pass
 
     r = do_query(args, query)
     x = json.loads(r.text)
