@@ -9,6 +9,7 @@ import random
 import re
 from itertools import zip_longest
 import csv
+import binascii
 
 # option to hardcode URL & URI
 global_url = "http://127.0.0.1:7474"
@@ -493,63 +494,94 @@ def add_spw(args):
 
 def dpat_func(args):
 
-    ntds = open(args.ntdsfile,'r').readlines()
-    pot = open(args.potfile,'r').readlines()
-    for line in ntds:
-
-
-
-
-    #     if ":::" not in line:
-    #         continue
-    #     full_user = line.split(":")[0]
-    #     try:
-    #         user = full_user.split('\\')[1]
-    #         domain = full_user.split('\\')[0]
-    #     except:
-    #         print(full_user)
-
-
-    full_user = line.split(":")[0]
-    user = full_user.split('\\')[1]
-    domain = full_user.split('\\')[0]
-    rid = line.split(":")[1]
-    username = user + "@" + domain
-
+    print("DPAT Function")
+    '''
+    Administrator:500:aad3b435b51404eeaad3b435b51404ee:b4b9b02e6f09a9bd760f388b67351e2b:::
+    Guest:501:aad3b435b51404eeaad3b435b51404ee:31d6cfe0d16ae931b73c59d7e0c089c0:::
+    testlab.local\bob:1000:aad3b435b51404eeaad3b435b51404ee:b4b9b02e6f09a9bd760f388b67351e2b:::
+    testlab.local\tom:1001:aad3b435b51404eeaad3b435b51404ee:b4b9b02e6f09a9bd760f388b67351e2b:::
+    '''
+    '''
     query1 = "match (u:User) where u.name='{username}' return u.name,u.objectid".format(username=username)
+
     query2 = "match (u:User) where u.name starts with '{username}@' and u.objectid ends with '-{rid}' return u.name,u.objectid".format(username=user, rid=rid)
+    '''
+    # [user1, user2, ...]
+    lm = []
 
-    do_query()
+    cracked = {}
+
+    if (args.ntdsfile != None):
+        ntds = open(args.ntdsfile, 'r').readlines()
+    else:
+        print("Error: Need NTDS file")
+        return
+    if (args.potfile != None):
+        potfile = open(args.potfile, 'r').readlines()
+    else:
+        print("Error: Need potfile")
+        return
+    try:
+        ntds_parsed = []
+        for line in ntds:
+            # [ username, domain, rid, LM, NT, plaintext||None]
+            to_append = []
+            if (line.split(":")[0].split("\\")[0] == line.split(":")[0]):
+                # no domain found, local account
+                to_append.append(line.split(":")[0])
+                to_append.append("")
+            else:
+                to_append.append(line.split(":")[0].split("\\")[1])
+                to_append.append(line.split(":")[0].split("\\")[0])
+            to_append.append(line.split(":")[1])
+            to_append.append(line.split(":")[2])
+            to_append.append(line.split(":")[3])
+            to_append.append(None)
+            ntds_parsed.append(to_append)
+        print(ntds_parsed)
+
+        # password stats like counting reused cracked passwords
+        for user in ntds_parsed:
+            for line in potfile:
+                line = line.replace("\r", "").replace("\n", "")
+                if (user[3] != "aad3b435b51404eeaad3b435b51404ee"):
+                    # LM found
+                    lm.append(user)
+                if (line.split(":")[0] == user[4]):
+                    # found in potfile, cracked
+                    if ("$HEX[" in line.split(":")[1]):
+                        print("found $HEX[]")
+                        user[5] = binascii.unhexlify( str( line.split(":")[1].split("[")[1].replace("]", "") ) )
+                    else:
+                        user[5] = line.split(":")[1]
+                    if (user[5] not in cracked):
+                        cracked[user[5]] = 0
+                    cracked[user[5]] += 1
+                if (user[4] == "31d6cfe0d16ae931b73c59d7e0c089c0"):
+                    user[5] = ""
+
+        try:
+            for user in ntds_parsed:
+                # [ username, domain, rid, LM, NT, plaintext||None]
+                # try query1 to see if we can resolve the users 
+                query1 = "match (u:User) where u.name='{username}' return u.name,u.objectid".format(username=user[0])
+                r = do_query(args,query1)
+                bh_users = json.loads(r.text)['results'][0]['data']
+                print("[*] BloodHound data queried successfully")
+                for bh_user in bh_users:
+                    print(bh_user)
+        except Exception as f:
+            print("got error")
+            print(f)
+            return
 
 
-
-    # for user in ntds:
-    #
-    #     only pull out users that were "cracked"
-    #
-    # for user in cracked list:
-    #
-    #     need to figure out how to sort between local users/computer objects/users without speified "domain"
-    #     need an exception for "Administrator" user
-    #     can have a domain user that is just user1:rid:hash:hash, but has entry in BH. Adminsitrator has the local user and the domain one, so need edge case
-    #
-    #
-    #     get username and domain, search specifically in BH
-    #     if not found:
-    #         get username and rid
-    #         search through BH
-    #         if found:
-    #             add user/ID to array
-    #         else:
-    #             skip and note as "not found"
-    #
-    #
-    # querylist = [
-    #
-    # ]
-
-
-
+        print(ntds_parsed)
+        print(cracked)
+    except Exception as e:
+        print("Got error:")
+        print(e)
+        return
 
 def pet_max():
 
@@ -680,7 +712,7 @@ def main():
 
 
     if not do_test(args):
-        print("Connection error: restart Neo4j console or verify the the following URL is available: {}".format(args.url))
+        print("Connection error: restart Neo4j console or verify the the following URL is available: http://127.0.0.1:7474")
         exit()
 
     if args.command == "get-info":
