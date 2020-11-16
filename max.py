@@ -9,6 +9,7 @@ import random
 import re
 from itertools import zip_longest
 import csv
+import binascii
 
 # option to hardcode URL & URI
 global_url = "http://127.0.0.1:7474"
@@ -497,62 +498,174 @@ def add_spw(args):
 
 def dpat_func(args):
 
-    # ntds = open(args.ntdsfile,'r').readlines()
-    # pot = open(args.potfile,'r').readlines()
-    # for line in ntds:
-    #
-    #
-
-
-    #     if ":::" not in line:
-    #         continue
-    #     full_user = line.split(":")[0]
-    #     try:
-    #         user = full_user.split('\\')[1]
-    #         domain = full_user.split('\\')[0]
-    #     except:
-    #         print(full_user)
-
-
-    full_user = line.split(":")[0]
-    user = full_user.split('\\')[1]
-    domain = full_user.split('\\')[0]
-    rid = line.split(":")[1]
-    username = user + "@" + domain
-
+    '''
+    Administrator:500:aad3b435b51404eeaad3b435b51404ee:b4b9b02e6f09a9bd760f388b67351e2b:::
+    Guest:501:aad3b435b51404eeaad3b435b51404ee:31d6cfe0d16ae931b73c59d7e0c089c0:::
+    testlab.local\bob:1000:aad3b435b51404eeaad3b435b51404ee:b4b9b02e6f09a9bd760f388b67351e2b:::
+    testlab.local\tom:1001:aad3b435b51404eeaad3b435b51404ee:b4b9b02e6f09a9bd760f388b67351e2b:::
+    '''
+    '''
     query1 = "match (u:User) where u.name='{username}' return u.name,u.objectid".format(username=username)
     query2 = "match (u:User) where u.name starts with '{username}@' and u.objectid ends with '-{rid}' return u.name,u.objectid".format(username=user, rid=rid)
+    '''
+    # [user1, user2, ...]
+    lm = []
+    cracked = {}
+    cracked_user_info = {}
 
-    do_query()
+    if (args.ntdsfile != None):
+        ntds = open(args.ntdsfile, 'r').readlines()
+    else:
+        print("Error: Need NTDS file")
+        return
+    if (args.potfile != None):
+        potfile = open(args.potfile, 'r').readlines()
+    else:
+        print("Error: Need potfile")
+        return
+    try:
+        print("[+] Processing NTDS")
+        ntds_parsed = []
+        ntds_cracked = []
+        for line in ntds:
+            if ":::" not in line or '$' in line: #filters out other lines in ntds/computer obj
+                continue
+            line = line.replace("\r", "").replace("\n", "")
+            if (line == ""):
+                continue
+            # [ username, domain, rid, LM, NT, plaintext||None]
+            to_append = []
+            if (line.split(":")[0].split("\\")[0] == line.split(":")[0]):
+                # no domain found, local account
+                to_append.append(line.split(":")[0])
+                to_append.append("")
+            else:
+                to_append.append(line.split(":")[0].split("\\")[1])
+                to_append.append(line.split(":")[0].split("\\")[0])
+            to_append.append(line.split(":")[1])
+            to_append.append(line.split(":")[2])
+            to_append.append(line.split(":")[3])
+            to_append.append(None)
+            ntds_parsed.append(to_append)
+        #print(ntds_parsed)
+
+        print("[+] Processing Potfile")
+        # password stats like counting reused cracked passwords
+        for user in ntds_parsed:
+            # LM found
+            if (user[3] != "aad3b435b51404eeaad3b435b51404ee"):
+                lm.append(user)
+
+            for line in potfile:
+                line = line.replace("\r", "").replace("\n", "").replace("$NT$", "").replace("$LM$", "")
+
+                # match NT hash
+                if (line.split(":")[0] == user[4]):
+                    # found in potfile, cracked
+                    if ("$HEX[" in line.split(":")[1]):
+                        print("found $HEX[]")
+                        user[5] = binascii.unhexlify( str( line.split(":")[1].split("[")[1].replace("]", "") ) )
+                    else:
+                        if (user[4] == "31d6cfe0d16ae931b73c59d7e0c089c0"):
+                            user[5] = ""
+                        else:
+                            user[5] = line.split(":")[1]
+                    if (user[5] not in cracked):
+                        cracked[user[5]] = 0
+                    cracked[user[5]] += 1
+                    ntds_cracked.append(user)
+
+        try:
+            for i in range(0,len(ntds_cracked)):
+                # [ username, domain, rid, LM, NT, plaintext||None, bh username, sid]
+                # try query1 to see if we can resolve the users based off solely username+domain
+                try:
+                    user = ntds_cracked[i]
+                    query1 = "match (u:User) where u.name='{username}' set u.cracked=true return u.name,u.objectid".format(username=str(user[0].upper().strip() + "@" + user[1].upper().strip()))
+                    r = do_query(args,query1)
+                    bh_users = json.loads(r.text)['results'][0]['data']
+                    if bh_users == []:
+                        # try matching based off username and rid
+                        query2 = "match (u:User) where u.name starts with '{username}@' and u.objectid ends with '-{rid}' set u.cracked=true return u.name,u.objectid".format(username=user[0].upper(), rid=user[2].upper())
+                        r = do_query(args,query2)
+                        bh_users = json.loads(r.text)['results'][0]['data']
+
+                    bh_username = bh_users[0]['row'][0]
+                    bh_sid = bh_users[0]['row'][1]
+
+                    ntds_cracked[i].append(bh_username)
+
+                    cracked_user_info[bh_sid] = ntds_cracked[i]
+
+                except Exception as g:
+                    # user doesn't have an entry in AD, disregard
+                    pass
 
 
+        except Exception as f:
+            print("got error: {}".format(f))
+            return
 
-    # for user in ntds:
-    #
-    #     only pull out users that were "cracked"
-    #
-    # for user in cracked list:
-    #
-    #     need to figure out how to sort between local users/computer objects/users without speified "domain"
-    #     need an exception for "Administrator" user
-    #     can have a domain user that is just user1:rid:hash:hash, but has entry in BH. Adminsitrator has the local user and the domain one, so need edge case
-    #
-    #
-    #     get username and domain, search specifically in BH
-    #     if not found:
-    #         get username and rid
-    #         search through BH
-    #         if found:
-    #             add user/ID to array
-    #         else:
-    #             skip and note as "not found"
-    #
-    #
-    # querylist = [
-    #
-    # ]
+        print("[*] BloodHound data queried successfully, {} NTDS users mapped to BH data".format(len(ntds_parsed)))
+
+        # print(ntds_cracked)
+        # print(cracked)
+        # print(lm)
+
+    except Exception as e:
+        print("Got error: {}".format(e))
+        return
+
+    queries = [
+        {
+            'query' : "MATCH (g:Group) WHERE g.objectid ENDS WITH '-512' MATCH (u:User {cracked:true})-[r:MemberOf*1..]->(g) RETURN DISTINCT u.name,u.objectid",
+            'label' : "Domain Admin accounts cracked"
+        },
+        {
+            'query' : "MATCH (g:Group) WHERE g.objectid ENDS WITH '-519' MATCH (u:User {cracked:true})-[r:MemberOf*1..]->(g) RETURN DISTINCT u.name,u.objectid",
+            'label' : "Enterprise Admin accounts cracked"
+        },
+        {
+            'query' : "MATCH (g:Group) WHERE g.objectid ENDS WITH '-544' MATCH (u:User {cracked:true})-[r:MemberOf]->(g) RETURN DISTINCT u.name,u.objectid",
+            'label' : "Administrator group member accounts cracked"
+        },
+        {
+            'query' : "MATCH (u:User {cracked:true,enabled:true}) RETURN DISTINCT u.name,u.objectid",
+            'label' : "Enabled accounts cracked"
+        },
+        {
+            'query' : "MATCH (u:User {cracked:true,enabled:false}) RETURN DISTINCT u.name,u.objectid",
+            'label' : "Disabled accounts cracked"
+        },
+        {
+            'query' : "MATCH (u:User {cracked:true,hasspn:true}) RETURN DISTINCT u.name,u.objectid",
+            'label' : "Kerberoastable users cracked"
+        },
+        {
+            'query' : "MATCH (u:User {cracked:true,unconstraineddelegation:true}) RETURN DISTINCT u.name,u.objectid",
+            'label' : "Unconstrained delegation accounts cracked"
+        },
+        {
+            "query" : "MATCH (m:User {cracked:true}),(n {highvalue:true}),p=shortestPath((m)-[r*1..]->(n)) WHERE NONE (r IN relationships(p) WHERE type(r)= 'GetChanges') AND NONE (r in relationships(p) WHERE type(r)='GetChangesAll') AND NOT m=n RETURN DISTINCT m.name,m.objectid",
+            "label" : "Accounts with paths to High Value Targets"
+        }
+    ]
+
+    for search_value in queries:
+
+        query = search_value['query']
+        label = search_value['label']
+        print('\n' + label + '\n')
+
+        r = do_query(args,query)
+        resp = json.loads(r.text)['results'][0]['data']
+        for entry in resp:
+            print(entry['row'][0])
 
 
+    # clear the "cracked" tag
+    clear_query = "MATCH (u:User {cracked:true}) REMOVE u.cracked"
+    do_query(args,clear_query)
 
 
 def pet_max():
