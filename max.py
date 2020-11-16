@@ -549,10 +549,11 @@ def dpat_func(args):
         # password stats like counting reused cracked passwords
         for user in ntds_parsed:
             for line in potfile:
-                line = line.replace("\r", "").replace("\n", "")
+                line = line.replace("\r", "").replace("\n", "").replace("$NT$", "").replace("$LM$", "")
                 if (user[3] != "aad3b435b51404eeaad3b435b51404ee"):
                     # LM found
                     lm.append(user)
+                # need to check if LM since it will be split up or skip over it since now a days if there's LM it will be cracked
                 if (line.split(":")[0] == user[4]):
                     # found in potfile, cracked
                     if ("$HEX[" in line.split(":")[1]):
@@ -569,7 +570,7 @@ def dpat_func(args):
         try:
             for user in ntds_parsed:
                 # [ username, domain, rid, LM, NT, plaintext||None]
-                # try query1 to see if we can resolve the users 
+                # try query1 to see if we can resolve the users, otherwise user query2 to match based off RID
                 if (user[1] != ""):
                     query = "match (u:User) where u.name='{username}' return u.name,u.objectid".format(username=str(user[0].upper() + "@" + user[1].upper()))
                 else:
