@@ -152,7 +152,6 @@ Few things to note:
 * `sidhist` returns a list of objects configured with SID History in the format `username - sid - foreign domain - foreign object name (if found)`
 * `unsupported` returns a list of all machines running unsupported operating systems, with the OS version
 * `get-note` returns the notes of each object, typically used with the `add-note` function in the `mark-*` modules
-* `enabled` only returned enabled users, works for the `users` and `passnotreq` flags currently
 * `-l` apply column labels as a header. All queries with `get-info` do not return column headers (like "UserName","ComputerName","Description",etc) by default with the query
 
 #### Module: mark-owned
