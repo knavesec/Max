@@ -629,7 +629,6 @@ def dpat_func(args):
                         lm_hashes[current_lm] -= 1
                     else:
                         lm_hashes.pop(current_lm, None)
-#                    if (
                     curent_nt = ntds_cracked[i][4]
                     if (nt_hashes[curent_nt] != 1):
                         nt_hashes[curent_nt] -= 1
@@ -649,14 +648,25 @@ def dpat_func(args):
         return
 
     if args.passwd:
+        print("[*] Searching for users with password {}".format(args.passwd))
         for user in ntds_cracked:
             if (user[5] == args.passwd):
-                print(user[6])
+                if (user[1] != ''):
+                    print("{}".format(user[6]))
+                else:
+                    print("{}".format(user[0]))
+
         return
     if args.usern:
         for user in ntds_cracked:
-            if (user[6] == args.usern):
-                print(sanitize(args, user[5]))
+            if (user[1] != ''):
+                if (user[6] == args.usern.upper()):
+                    print("{}:{}".format(user[6], sanitize(args, user[5])))
+            else:
+                continue
+                #if (user[0].upper() == args.usern.split("@")[0]):
+                #    print(sanitize(args, user[5]))
+
         return
 
     queries = [
@@ -775,9 +785,10 @@ def dpat_func(args):
     # Get Password (Complexity) Stats
     # sort from most reused to least reused dict to list of tuples
     # get the first instance of not repeated password to be min'd later
-    #print(cracked)
     num_repeated_passwords = 0
     cracked = sorted(cracked.items(), key=lambda x: x[1], reverse=True)
+    #print(len(cracked))
+    #print(cracked)
     for i in range(0, len(cracked)):
         if (cracked[i][1] == 1):
             num_repeated_passwords = i
