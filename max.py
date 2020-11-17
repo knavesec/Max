@@ -750,10 +750,11 @@ def dpat_func(args):
     # Get the Overall Stats ready
     num_pass_hashes = len(ntds_parsed)
     num_uniq_hash = len(nt_hashes)
-    num_cracked = (sum(cracked.values()) - cracked[''])
+    num_cracked = sum(cracked.values())
+    num_uniq_cracked = len(cracked)
     if (num_pass_hashes > 0):
-        perc_total_cracked = "{:2.2f}".format((float(sum(cracked.values())) / float(num_pass_hashes) * 100))
-        perc_uniq_cracked = "{:2.2f}".format((float(num_cracked) / float(num_uniq_hash) * 100))
+        perc_total_cracked = "{:2.2f}".format((float(num_cracked) / float(num_pass_hashes) * 100))
+        perc_uniq_cracked = "{:2.2f}".format((float(num_uniq_cracked) / float(num_uniq_hash) * 100))
     else:
         perc_total_cracked = 00.00
         perc_uniq_cracked = 00.00
@@ -770,7 +771,7 @@ def dpat_func(args):
         pw_len = len(password)
         if (pw_len not in password_lengths):
             password_lengths[pw_len] = 0
-        password_lengths[pw_len] += 1
+        password_lengths[pw_len] += cracked[password]
 
 
     # Get Password (Complexity) Stats
@@ -860,6 +861,7 @@ def dpat_func(args):
         print("|{:^10}|{:^75}|".format(num_pass_hashes, "Password Hashes"))
         print("|{:^10}|{:^75}|".format(num_uniq_hash, "Unique Password Hashes"))
         print("|{:^10}|{:^75}|".format(num_cracked, "Passwords Discovered Through Cracking")) # non-blank
+        print("|{:^10}|{:^75}|".format(num_uniq_cracked, "Unique Passwords Discovered Through Cracking")) # non-blank
         print("|{:^10}|{:^75}|".format(perc_total_cracked, "Percent of Passwords Cracked"))
         print("|{:^10}|{:^75}|".format(perc_uniq_cracked, "Percent of Unique Passwords Cracked"))
         print("|{:^10}|{:^75}|".format(non_blank_lm, "LM Hashes (Non-Blank)"))
