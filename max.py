@@ -11,6 +11,11 @@ from itertools import zip_longest
 import csv
 import binascii
 import math
+import os
+try:
+    import html as htmllib
+except ImportError:
+    import cgi as htmllib
 
 # option to hardcode URL & URI
 global_url = "http://127.0.0.1:7474"
@@ -511,6 +516,7 @@ def sanitize(args, pass_or_hash):
                 "*"*(lenp-2) + pass_or_hash[lenp-1]
         return sanitized_string
 
+
 def dpat_func(args):
 
     cracked = {}
@@ -754,6 +760,7 @@ def dpat_func(args):
     clear_query = "MATCH (u:User {cracked:true}) REMOVE u.cracked"
     do_query(args,clear_query)
 
+
     # Get the Overall Stats ready
     num_pass_hashes = len(ntds_parsed)
     num_uniq_hash = len(nt_hashes)
@@ -767,12 +774,23 @@ def dpat_func(args):
         perc_total_cracked = 00.00
         perc_uniq_cracked = 00.00
 
-    # get number of DAs to match DPAT, assume connection works since we mapped all users already 
+    # get number of DAs to match DPAT, assume connection works since we mapped all users already
     num_das = len(json.loads(do_query(args, "MATCH p=(n:User)-[r:MemberOf*1..]->(g:Group) WHERE g.objectid ENDS WITH '-512' RETURN DISTINCT n.name").text)['results'][0]['data'])
     num_eas = len(json.loads(do_query(args, "MATCH p=(n:User)-[r:MemberOf*1..]->(g:Group) WHERE g.objectid ENDS WITH '-519' RETURN DISTINCT n.name").text)['results'][0]['data'])
     non_blank_lm = sum(lm_hashes.values())
     uniq_lm = len(lm_hashes)
 
+    # print(ntds_parsed)
+
+    stats = [
+        [num_pass_hashes, "Password Hashes"], #, ntds_parsed],
+        [num_uniq_hash, "Unique Password Hashes"],
+        [num_cracked, "Passwords Discovered Through Cracking"],
+        [perc_total_cracked, "Percent of Passwords Cracked"],
+        [perc_uniq_cracked, "Percent of Unique Passwords Cracked"],
+        [non_blank_lm, "LM Hashes (Non-Blank)"],
+        [uniq_lm, "Unique LM Hashes (Non-Blank)"]
+    ]
 
     # Get Password Length Stats
     for password in cracked:
@@ -798,10 +816,6 @@ def dpat_func(args):
 
         full_data = []
 
-
-
-
-
         for item in output_data:
             label = item['label']
             enable_label = label + " - Enabled"
@@ -821,38 +835,113 @@ def dpat_func(args):
         print("[+] All data written to {}.csv".format(args.outputfile))
 
     # use if specifically so you can output both html & csv on the same run
+    # This code heavily modified from the original DPAT tool, credit where it's due
     if args.html:
         print("[-] Sorry, HTML storage not supported yet :/")
 
+        if not os.path.exists(args.outputfile):
+            os.makedirs(args.outputfile)
 
-        css_styling = """
-        table, th, td {
-            border: 1px solid black;
-            border-collapse: collapse;
-            text-align: center;
-        }
+        filebase = args.outputfile + "/"
+        filename_report = "report.html"
 
-        th, td {
-            padding: 5px;
-        }
+        # write report.css
+        css_styling =  ""
+        css_styling += "table, th, td { \n"
+        css_styling += "    border: 1px solid black; \n"
+        css_styling += "    border-collapse: collapse; \n"
+        css_styling += "    text-align: center; \n"
+        css_styling += "} \n"
+        css_styling += " \n"
+        css_styling += "th, td { \n"
+        css_styling += "    padding: 5px; \n"
+        css_styling += "} \n"
+        css_styling += " \n"
+        css_styling += "th { \n"
+        css_styling += "    border-bottom-width: 2px; \n"
+        css_styling += "} \n"
+        css_styling += " \n"
+        css_styling += "body { \n"
+        css_styling += "    justify-content: center; \n"
+        css_styling += "} \n"
+        css_styling += " \n"
+        css_styling += "table { \n"
+        css_styling += "    box-shadow: 0 7px 8px -4px rgba(0,0,0,.2),0 12px 17px 2px rgba(0,0,0,.14),0 5px 22px 4px rgba(0,0,0,.12)!important; \n"
+        css_styling += "    margin-top: 30px; \n"
+        css_styling += "} \n"
+        css_styling += " \n"
+        css_styling += "tr:nth-child(even) { \n"
+        css_styling += "    background: #d1d3d2; \n"
+        css_styling +="}"
 
-        th {
-            border-bottom-width: 2px;
-        }
+        f = open(os.path.join(filebase,"report.css"),'w')
+        f.writelines(css_styling)
+        f.close()
 
-        body {
-            justify-content: center;
-        }
+        class HtmlBuilder:
+            bodyStr = ""
 
-        table {
-            box-shadow: 0 7px 8px -4px rgba(0,0,0,.2),0 12px 17px 2px rgba(0,0,0,.14),0 5px 22px 4px rgba(0,0,0,.12)!important;
-            margin-top: 30px;
-        }
+            def build_html_body_string(self, str):
+                self.bodyStr += str + "</br>\n"
 
-        tr:nth-child(even) {
-            background: #d1d3d2;
-        }
-        """
+            def get_html(self):
+                return "<!DOCTYPE html>\n" + "<html>\n<head>\n<link rel='stylesheet' href='report.css'>\n</head>\n" + "<body>\n" + self.bodyStr  + "</body>\n" + "</html>\n"
+
+            def add_table_to_html(self, list, headers=[], col_to_not_escape=None):
+                html = '<table border="1">\n'
+                html += "<tr>"
+                for header in headers:
+                    if header is not None:
+                        html += "<th>" + str(header) + "</th>"
+                    else:
+                        html += "<th></th>"
+                html += "</tr>\n"
+                for line in list:
+                    html += "<tr>"
+                    col_num = 0
+                    for column in line:
+                        if column is not None:
+                            col_data = column
+                            if ((("Password") in headers[col_num] and not "Password Length" in headers[col_num]) or ("Hash" in headers[col_num]) or ("History" in headers[col_num])):
+                                col_data = sanitize(args, column)
+                            if col_num != col_to_not_escape:
+                                col_data = htmllib.escape(str(col_data))
+                            html += "<td>" + col_data + "</td>"
+                        else:
+                            html += "<td></td>"
+                        col_num += 1
+                    html += "</tr>\n"
+                html += "</table>"
+                self.build_html_body_string(html)
+
+            def write_html_report(self, filebase, filename):
+                f = open(os.path.join(filebase, filename), "w")
+                f.write(self.get_html())
+                f.close()
+                return filename
+
+        hb = HtmlBuilder()
+        summary_table = []
+        summary_table_headers = ("Count", "Description", "More Info")
+
+        for stat in stats:
+
+            if len(stat) == 2:
+
+                summary_table.append((stat[0], stat[1],""))
+
+
+                # list = [["uname", "pass", "pwd len", "nt", "only lm cracked"]]
+                #
+                # hbt = HtmlBuilder()
+                # hbt.add_table_to_html(list, ["Username", "Password", "Password Length", "NT Hash", "Only LM Cracked"])
+                # filename = hbt.write_html_report(filebase, "all hashes.html")
+                # summary_table.append((5, "Password Hashes","<a href=\"" + filename + "\">Details</a>"))
+
+
+        hb.add_table_to_html(summary_table, summary_table_headers, 2)
+        hb.write_html_report(filebase, filename_report)
+        print("[+] Report has been written to the \"" + filename_report + "\" file in the \"" + filebase + "\" directory")
 
         # print(css_styling)
 
@@ -867,14 +956,15 @@ def dpat_func(args):
         print(" " + "="*86)
         print("|{:^10}|{:^75}|".format("Count", "Description"))
         print(" " + "="*86)
-        print("|{:^10}|{:^75}|".format(num_pass_hashes, "Password Hashes"))
-        print("|{:^10}|{:^75}|".format(num_uniq_hash, "Unique Password Hashes"))
-        print("|{:^10}|{:^75}|".format(num_cracked, "Passwords Discovered Through Cracking")) # non-blank
-        print("|{:^10}|{:^75}|".format(num_uniq_cracked, "Unique Passwords Discovered Through Cracking")) # non-blank
-        print("|{:^10}|{:^75}|".format(perc_total_cracked, "Percent of Passwords Cracked"))
-        print("|{:^10}|{:^75}|".format(perc_uniq_cracked, "Percent of Unique Passwords Cracked"))
-        print("|{:^10}|{:^75}|".format(non_blank_lm, "LM Hashes (Non-Blank)"))
-        print("|{:^10}|{:^75}|".format(uniq_lm, "Unique LM Hashes (Non-Blank)"))
+        # print("|{:^10}|{:^75}|".format(num_pass_hashes, "Password Hashes"))
+        # print("|{:^10}|{:^75}|".format(num_uniq_hash, "Unique Password Hashes"))
+        # print("|{:^10}|{:^75}|".format(num_cracked, "Passwords Discovered Through Cracking")) # non-blank
+        # print("|{:^10}|{:^75}|".format(perc_total_cracked, "Percent of Passwords Cracked"))
+        # print("|{:^10}|{:^75}|".format(perc_uniq_cracked, "Percent of Unique Passwords Cracked"))
+        # print("|{:^10}|{:^75}|".format(non_blank_lm, "LM Hashes (Non-Blank)"))
+        # print("|{:^10}|{:^75}|".format(uniq_lm, "Unique LM Hashes (Non-Blank)"))
+        for set in stats:
+             print("|{:^10}|{:^75}|".format(set[0], set[1]))
 
         for item in output_data:
             print("|{:^10}|{:^75}|".format(len(item['enabled']),item['label'] + " - Enabled"))
