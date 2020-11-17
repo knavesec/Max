@@ -770,9 +770,15 @@ def dpat_func(args):
 
     # Get Password (Complexity) Stats
     # sort from most reused to least reused dict to list of tuples
+    # get the first instance of not repeated password to be min'd later
     #print(cracked)
+    num_repeated_passwords = 0
     cracked = sorted(cracked.items(), key=lambda x: x[1], reverse=True)
-    #print(cracked)
+    for i in range(0, len(cracked)):
+        if (cracked[i][1] == 1):
+            num_repeated_passwords = i
+            break
+
     if args.csv:
 
         full_data = []
@@ -879,7 +885,7 @@ def dpat_func(args):
         print(" " + "="*86)
         print("|{:^10}|{:^75}|".format("Count", "Description"))
         print(" " + "="*86)
-        for i in range(0, math.ceil( len(cracked) * 0.10 )):
+        for i in range(0, min(num_repeated_passwords, math.ceil( len(cracked) * 0.10 ), 50)):
             print("|{:^10}|{:^75}|".format(cracked[i][1], sanitize(args, cracked[i][0])))
         print(" " + "="*86)
         print("")
