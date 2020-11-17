@@ -749,11 +749,16 @@ def dpat_func(args):
 
     # Get the Overall Stats ready
     num_pass_hashes = len(ntds_parsed)
-    num_uniq_hash = len(cracked)
+    num_uniq_hash = len(nt_hashes)
     num_cracked = (sum(cracked.values()) - cracked[''])
-    perc_total_cracked = "{:2.2f}".format((float(sum(cracked.values())) / float(len(ntds_parsed)) * 100))
-    perc_uniq_cracked = "{:2.2f}".format((float(len(cracked)) / float(len(ntds_parsed)) * 100))
-    # get number of DAs to match DPAT
+    if (num_pass_hashes > 0):
+        perc_total_cracked = "{:2.2f}".format((float(sum(cracked.values())) / float(num_pass_hashes) * 100))
+        perc_uniq_cracked = "{:2.2f}".format((float(num_cracked) / float(num_uniq_hash) * 100))
+    else:
+        perc_total_cracked = 00.00
+        perc_uniq_cracked = 00.00
+
+    # get number of DAs to match DPAT, assume connection works since we mapped all users already 
     num_das = len(json.loads(do_query(args, "MATCH p=(n:User)-[r:MemberOf*1..]->(g:Group) WHERE g.objectid ENDS WITH '-512' RETURN DISTINCT n.name").text)['results'][0]['data'])
     num_eas = len(json.loads(do_query(args, "MATCH p=(n:User)-[r:MemberOf*1..]->(g:Group) WHERE g.objectid ENDS WITH '-519' RETURN DISTINCT n.name").text)['results'][0]['data'])
     non_blank_lm = sum(lm_hashes.values())
@@ -885,7 +890,7 @@ def dpat_func(args):
         print(" " + "="*86)
         print("|{:^10}|{:^75}|".format("Count", "Description"))
         print(" " + "="*86)
-        for i in range(0, min(num_repeated_passwords, math.ceil( len(cracked) * 0.10 ), 50)):
+        for i in range(0, min(num_repeated_passwords, math.ceil( len(cracked) * 0.10 ), 50)): # cap at 50 reused passwords
             print("|{:^10}|{:^75}|".format(cracked[i][1], sanitize(args, cracked[i][0])))
         print(" " + "="*86)
         print("")
