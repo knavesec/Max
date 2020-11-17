@@ -513,16 +513,6 @@ def sanitize(args, pass_or_hash):
 
 def dpat_func(args):
 
-    '''
-    Administrator:500:aad3b435b51404eeaad3b435b51404ee:b4b9b02e6f09a9bd760f388b67351e2b:::
-    Guest:501:aad3b435b51404eeaad3b435b51404ee:31d6cfe0d16ae931b73c59d7e0c089c0:::
-    testlab.local\bob:1000:aad3b435b51404eeaad3b435b51404ee:b4b9b02e6f09a9bd760f388b67351e2b:::
-    testlab.local\tom:1001:aad3b435b51404eeaad3b435b51404ee:b4b9b02e6f09a9bd760f388b67351e2b:::
-    '''
-    '''
-    query1 = "match (u:User) where u.name='{username}' return u.name,u.objectid".format(username=username)
-    query2 = "match (u:User) where u.name starts with '{username}@' and u.objectid ends with '-{rid}' return u.name,u.objectid".format(username=user, rid=rid)
-    '''
     cracked = {}
     cracked_user_info = {}
     lm_hashes = {}
@@ -654,12 +644,19 @@ def dpat_func(args):
 
         print("[*] BloodHound data queried successfully, {} NTDS users mapped to BH data".format(len(ntds_parsed)))
 
-        # print(ntds_cracked)
-        # print(cracked)
-        # print(lm)
-
     except Exception as e:
         print("[-] Error, {}".format(e))
+        return
+
+    if args.passwd:
+        for user in ntds_cracked:
+            if (user[5] == args.passwd):
+                print(user[6])
+        return
+    if args.usern:
+        for user in ntds_cracked:
+            if (user[6] == args.usern):
+                print(sanitize(args, user[5]))
         return
 
     queries = [
@@ -756,6 +753,7 @@ def dpat_func(args):
         perc_total_cracked = "{:2.2f}".format((float(num_cracked) / float(num_pass_hashes) * 100))
         perc_uniq_cracked = "{:2.2f}".format((float(num_uniq_cracked) / float(num_uniq_hash) * 100))
     else:
+        # avoid div by zero
         perc_total_cracked = 00.00
         perc_uniq_cracked = 00.00
 
@@ -1022,6 +1020,8 @@ def main():
     # DPAT function parameters
     dpat.add_argument("-n","--ntds",dest="ntdsfile",default="",required=True,help="NTDS file name")
     dpat.add_argument("-p","--pot",dest="potfile",default="",required=True,help="Hashcat potfile")
+    dpat.add_argument("-e","--password",dest="passwd",default="",required=False,help="Returns all users using the argument as a password")
+    dpat.add_argument("-u","--username",dest="usern",default="",required=False,help="Returns the password for the user if cracked")
     dpat.add_argument("-s","--sanitize",dest="sanitize",action="store_true",required=False,help="Sanitize the report by partially redacting passwords and hashes")
     dpat.add_argument("-o","--outputfile",dest="outputfile",default="",required=False,help="Output filename to store results, cli if none")
     dpat.add_argument("--csv",dest="csv",action="store_true",required=False,help="Store the output in a CSV format")
