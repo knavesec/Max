@@ -10,6 +10,7 @@ import re
 from itertools import zip_longest
 import csv
 import binascii
+import math
 
 # option to hardcode URL & URI
 global_url = "http://127.0.0.1:7474"
@@ -471,7 +472,6 @@ def add_spns(args):
 
     print('HasSPNConfigured relationships created: ' + str(count))
 
-
 def add_spw(args):
 
     statement = "MATCH (n {{name:\"{name1}\"}}),(m {{name:\"{name2}\"}}) MERGE (n)-[r1:SharesPasswordWith]->(m) MERGE (m)-[r2:SharesPasswordWith]->(n) return n,m"
@@ -495,6 +495,20 @@ def add_spw(args):
 
     print("SharesPasswordWith relationships created: " + str(count))
 
+# stolen code from https://github.com/clr2of8/DPAT/blob/master/dpat.py#L64
+def sanitize(args, pass_or_hash):
+    if not args.sanitize:
+        return pass_or_hash
+    else:
+        sanitized_string = pass_or_hash
+        lenp = len(pass_or_hash)
+        if lenp == 32:
+            sanitized_string = pass_or_hash[0:4] + \
+                "*"*(lenp-8) + pass_or_hash[lenp-5:lenp-1]
+        elif lenp > 2:
+            sanitized_string = pass_or_hash[0] + \
+                "*"*(lenp-2) + pass_or_hash[lenp-1]
+        return sanitized_string
 
 def dpat_func(args):
 
@@ -508,10 +522,13 @@ def dpat_func(args):
     query1 = "match (u:User) where u.name='{username}' return u.name,u.objectid".format(username=username)
     query2 = "match (u:User) where u.name starts with '{username}@' and u.objectid ends with '-{rid}' return u.name,u.objectid".format(username=user, rid=rid)
     '''
-    # [user1, user2, ...]
-    lm = []
     cracked = {}
     cracked_user_info = {}
+    lm_hashes = {}
+    nt_hashes = {}
+
+    query_counts = {}
+    password_lengths = {}
 
     if (args.ntdsfile != None):
         ntds = open(args.ntdsfile, 'r').readlines()
@@ -533,18 +550,23 @@ def dpat_func(args):
             line = line.replace("\r", "").replace("\n", "")
             if (line == ""):
                 continue
+            else:
+                line = line.split(":")
             # [ username, domain, rid, LM, NT, plaintext||None]
             to_append = []
-            if (line.split(":")[0].split("\\")[0] == line.split(":")[0]):
+            if (line[0].split("\\")[0] == line[0]):
                 # no domain found, local account
-                to_append.append(line.split(":")[0])
+                to_append.append(line[0])
                 to_append.append("")
             else:
-                to_append.append(line.split(":")[0].split("\\")[1])
-                to_append.append(line.split(":")[0].split("\\")[0])
-            to_append.append(line.split(":")[1])
-            to_append.append(line.split(":")[2])
-            to_append.append(line.split(":")[3])
+                to_append.append(line[0].split("\\")[1])
+                to_append.append(line[0].split("\\")[0])
+            to_append.append(line[1])
+            to_append.append(line[2])
+            to_append.append(line[3])
+            if (line[3] not in nt_hashes):
+                nt_hashes[line[3]] = 0
+            nt_hashes[line[3]] += 1
             to_append.append(None)
             ntds_parsed.append(to_append)
         #print(ntds_parsed)
@@ -554,22 +576,27 @@ def dpat_func(args):
         for user in ntds_parsed:
             # LM found
             if (user[3] != "aad3b435b51404eeaad3b435b51404ee"):
-                lm.append(user)
+                if (user[3] not in lm_hashes):
+                    lm_hashes[user[3]] = 0
+                lm_hashes[user[3]] += 1
 
             for line in potfile:
-                line = line.replace("\r", "").replace("\n", "").replace("$NT$", "").replace("$LM$", "")
+                line = line.replace("\r", "").replace("\n", "")
+                if (line == ""):
+                    continue
+                line = line.replace("$NT$", "").replace("$LM$", "").split(":")
 
                 # match NT hash
-                if (line.split(":")[0] == user[4]):
+                if (line[0] == user[4]):
                     # found in potfile, cracked
-                    if ("$HEX[" in line.split(":")[1]):
+                    if ("$HEX[" in line[1]):
                         print("found $HEX[]")
-                        user[5] = binascii.unhexlify( str( line.split(":")[1].split("[")[1].replace("]", "") ) )
+                        user[5] = binascii.unhexlify( str( line[1].split("[")[1].replace("]", "") ) )
                     else:
                         if (user[4] == "31d6cfe0d16ae931b73c59d7e0c089c0"):
                             user[5] = ""
                         else:
-                            user[5] = line.split(":")[1]
+                            user[5] = line[1]
                     if (user[5] not in cracked):
                         cracked[user[5]] = 0
                     cracked[user[5]] += 1
@@ -598,7 +625,17 @@ def dpat_func(args):
                     cracked_user_info[bh_sid] = ntds_cracked[i]
 
                 except Exception as g:
-                    # user doesn't have an entry in AD, disregard
+                    # user doesn't have an entry in AD, disregard and cleanup stats
+                    curent_lm = ntds_cracked[i][3]
+                    if (lm_hashes[curent_lm] != 1):
+                        lm_hashes[curent_lm] -= 1
+                    else:
+                        lm_hashes.pop(curent_lm, None)
+                    curent_nt = ntds_cracked[i][3]
+                    if (nt_hashes[curent_nt] != 1):
+                        nt_hashes[curent_nt] -= 1
+                    else:
+                        nt_hashes.pop(curent_nt, None)
                     pass
 
 
@@ -655,17 +692,86 @@ def dpat_func(args):
 
         query = search_value['query']
         label = search_value['label']
+        if (label not in query_counts):
+            query_counts[label] = 0 
         print('\n' + label + '\n')
 
         r = do_query(args,query)
         resp = json.loads(r.text)['results'][0]['data']
         for entry in resp:
             print(entry['row'][0])
+            query_counts[label] += 1
 
 
     # clear the "cracked" tag
     clear_query = "MATCH (u:User {cracked:true}) REMOVE u.cracked"
     do_query(args,clear_query)
+
+    # Get the Overall Stats ready
+    num_pass_hashes = len(ntds_parsed)
+    num_uniq_hash = len(cracked)
+    num_cracked = (sum(cracked.values()) - cracked[''])
+    perc_total_cracked = "{:2.2f}".format((float(sum(cracked.values())) / float(len(ntds_parsed)) * 100))
+    perc_uniq_cracked = "{:2.2f}".format((float(len(cracked)) / float(len(ntds_parsed)) * 100))
+    # get number of DAs to match DPAT
+    num_das = len(json.loads(do_query(args, "MATCH p=(n:User)-[r:MemberOf*1..]->(g:Group) WHERE g.objectid ENDS WITH '-512' RETURN DISTINCT n.name").text)['results'][0]['data'])
+    num_eas = len(json.loads(do_query(args, "MATCH p=(n:User)-[r:MemberOf*1..]->(g:Group) WHERE g.objectid ENDS WITH '-519' RETURN DISTINCT n.name").text)['results'][0]['data'])
+    non_blank_lm = sum(lm_hashes.values())
+    uniq_lm = len(lm_hashes)
+
+
+    # Get Password Length Stats
+    for password in cracked:
+        pw_len = len(password)
+        if (pw_len not in password_lengths):
+            password_lengths[pw_len] = 0
+        password_lengths[pw_len] += 1
+
+
+    # Get Password (Complexity) Stats
+    # sort from most reused to least reused dict to list of tuples 
+    cracked = sorted(cracked.items(), reverse=True)
+
+
+    count_width = 10
+    print("")
+    print("")
+    print("{:^64}".format("Overall Statistics"))
+    print(" " + "="*62)
+    print("|{:^10}|{:^51}|".format("Count", "Description"))
+    print(" " + "="*62)
+    print("|{:^10}|{:^51}|".format(num_pass_hashes, "Password Hashes"))
+    print("|{:^10}|{:^51}|".format(num_uniq_hash, "Unique Password Hashes"))
+    print("|{:^10}|{:^51}|".format(num_cracked, "Passwords Discovered Through Cracking")) # non-blank
+    print("|{:^10}|{:^51}|".format(perc_total_cracked, "Percent of Passwords Cracked"))
+    print("|{:^10}|{:^51}|".format(perc_uniq_cracked, "Percent of Unique Passwords Cracked"))
+    print("|{:^10}|{:^51}|".format(num_das, "Members of Domain Admins"))
+    print("|{:^10}|{:^51}|".format(query_counts["Domain Admin accounts cracked"], "Domain Admin Passwords Cracked"))
+    print("|{:^10}|{:^51}|".format(num_das, "Members of Enterprise Admins"))
+    print("|{:^10}|{:^51}|".format(query_counts["Enterprise Admin accounts cracked"], "Enterprise Admin Passwords Cracked"))
+    print("|{:^10}|{:^51}|".format(non_blank_lm, "LM Hashes (Non-Blank)"))
+    print("|{:^10}|{:^51}|".format(uniq_lm, "Unique LM Hashes (Non-Blank)"))
+    print(" " + "="*62)
+    print("")
+    print("")
+    print("{:^64}".format("Password Length Stats"))
+    print(" " + "="*62)
+    print("|{:^10}|{:^51}|".format("Count", "Description"))
+    print(" " + "="*62)
+    for pw_len in sorted(password_lengths.keys(), reverse=True):
+        print("|{:^10}|{:^51}|".format(password_lengths[pw_len], "{} Characters".format(pw_len)))
+    print(" " + "="*62)
+    print("")
+    print("")
+    print("{:^64}".format("Password Reuse Stats (Top 10%)"))
+    print(" " + "="*62)
+    print("|{:^10}|{:^51}|".format("Count", "Description"))
+    print(" " + "="*62)
+    for i in range(0, math.ceil( len(cracked) * 0.10 )):
+        print("|{:^10}|{:^51}|".format(cracked[i][1], sanitize(args, cracked[i][0])))
+    print(" " + "="*62)
+    print("")
+    print("")
 
 
 def pet_max():
