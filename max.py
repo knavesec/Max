@@ -470,7 +470,8 @@ def add_spns(args):
             print("[+] Relationship " + set[0] + " -- HasSPNConfigured -> " + set[1] + " added")
             count = count + 1
 
-    print('HasSPNConfigured relationships created: ' + str(count))
+    print('[+] HasSPNConfigured relationships created: ' + str(count))
+
 
 def add_spw(args):
 
@@ -493,9 +494,9 @@ def add_spw(args):
             if r.text != fail_resp:
                 count = count + 1
 
-    print("SharesPasswordWith relationships created: " + str(count))
+    print("[+] SharesPasswordWith relationships created: " + str(count))
 
-# stolen code from https://github.com/clr2of8/DPAT/blob/master/dpat.py#L64
+# code from https://github.com/clr2of8/DPAT/blob/master/dpat.py#L64
 def sanitize(args, pass_or_hash):
     if not args.sanitize:
         return pass_or_hash
@@ -664,35 +665,47 @@ def dpat_func(args):
     queries = [
         {
             'query' : "MATCH (u:User {cracked:true}) RETURN DISTINCT u.name,u.objectid,u.enabled",
-            'label' : "All user accounts cracked"
+            'label' : "All User Accounts Cracked"
+        },
+        {
+            'query' : "MATCH (g:Group) WHERE g.objectid ENDS WITH '-512' MATCH (u:User)-[r:MemberOf*1..]->(g) RETURN DISTINCT u.name,u.objectid,u.enabled",
+            'label' : "Domain Admin Members"
         },
         {
             'query' : "MATCH (g:Group) WHERE g.objectid ENDS WITH '-512' MATCH (u:User {cracked:true})-[r:MemberOf*1..]->(g) RETURN DISTINCT u.name,u.objectid,u.enabled",
-            'label' : "Domain Admin accounts cracked"
+            'label' : "Domain Admin Accounts Cracked"
+        },
+        {
+            'query' : "MATCH (g:Group) WHERE g.objectid ENDS WITH '-519' MATCH (u:User)-[r:MemberOf*1..]->(g) RETURN DISTINCT u.name,u.objectid,u.enabled",
+            'label' : "Enterprise Admin Members"
         },
         {
             'query' : "MATCH (g:Group) WHERE g.objectid ENDS WITH '-519' MATCH (u:User {cracked:true})-[r:MemberOf*1..]->(g) RETURN DISTINCT u.name,u.objectid,u.enabled",
-            'label' : "Enterprise Admin accounts cracked"
+            'label' : "Enterprise Admin Accounts Cracked"
+        },
+        {
+            'query' : "MATCH (g:Group) WHERE g.objectid ENDS WITH '-544' MATCH (u:User)-[r:MemberOf]->(g) RETURN DISTINCT u.name,u.objectid,u.enabled",
+            'label' : "Administrator Group Members"
         },
         {
             'query' : "MATCH (g:Group) WHERE g.objectid ENDS WITH '-544' MATCH (u:User {cracked:true})-[r:MemberOf]->(g) RETURN DISTINCT u.name,u.objectid,u.enabled",
-            'label' : "Administrator group member accounts cracked"
+            'label' : "Administrator Group Member Accounts Cracked"
         },
         {
             'query' : "MATCH (u:User {cracked:true,hasspn:true}) RETURN DISTINCT u.name,u.objectid,u.enabled",
-            'label' : "Kerberoastable users cracked"
+            'label' : "Kerberoastable Users Cracked"
         },
         {
             'query' : "MATCH (u:User {cracked:true,dontreqpreauth:true}) RETURN DISTINCT u.name,u.objectid,u.enabled",
-            'label' : "Accounts not requiring Kerberos Pre-Authentication cracked"
+            'label' : "Accounts Not Requiring Kerberos Pre-Authentication Cracked"
         },
         {
             'query' : "MATCH (u:User {cracked:true,unconstraineddelegation:true}) RETURN DISTINCT u.name,u.objectid,u.enabled",
-            'label' : "Unconstrained delegation accounts cracked"
+            'label' : "Unconstrained Delegation Accounts Cracked"
         },
         {
             "query" : "MATCH (u:User {cracked:true}),(n {highvalue:true}),p=shortestPath((u)-[r*1..]->(n)) WHERE NONE (r IN relationships(p) WHERE type(r)= 'GetChanges') AND NONE (r in relationships(p) WHERE type(r)='GetChangesAll') AND NOT u=n RETURN DISTINCT u.name,u.objectid,u.enabled",
-            "label" : "Accounts with paths to High Value Targets"
+            "label" : "Accounts With Paths To High Value Targets"
         }
     ]
 
@@ -712,7 +725,7 @@ def dpat_func(args):
         query = search_value['query']
         label = search_value['label']
         if (label not in query_counts):
-            query_counts[label] = 0 
+            query_counts[label] = 0
         print("[+] Querying for \"" + label + "\"")
         dat = { 'label' : label }
         dat['enabled'] = []
@@ -756,13 +769,18 @@ def dpat_func(args):
 
 
     # Get Password (Complexity) Stats
-    # sort from most reused to least reused dict to list of tuples 
+    # sort from most reused to least reused dict to list of tuples
     #print(cracked)
     cracked = sorted(cracked.items(), key=lambda x: x[1], reverse=True)
     #print(cracked)
     if args.csv:
 
         full_data = []
+
+
+
+
+
         for item in output_data:
             label = item['label']
             enable_label = label + " - Enabled"
@@ -779,8 +797,10 @@ def dpat_func(args):
             wr = csv.writer(file)
             wr.writerows(export_data)
         file.close()
+        print("[+] All data written to {}.csv".format(args.outputfile))
 
-    elif args.html:
+    # use if specifically so you can output both html & csv on the same run
+    if args.html:
         print("[-] Sorry, HTML storage not supported yet :/")
 
 
@@ -814,46 +834,54 @@ def dpat_func(args):
         """
 
         # print(css_styling)
-    else:
+
+    if args.outputfile == "":
+        print("[+] Outputting Stats to Terminal...")
 
         # Output to CLI
 
         print("")
         print("")
-        print("{:^64}".format("Overall Statistics"))
-        print(" " + "="*62)
-        print("|{:^10}|{:^51}|".format("Count", "Description"))
-        print(" " + "="*62)
-        print("|{:^10}|{:^51}|".format(num_pass_hashes, "Password Hashes"))
-        print("|{:^10}|{:^51}|".format(num_uniq_hash, "Unique Password Hashes"))
-        print("|{:^10}|{:^51}|".format(num_cracked, "Passwords Discovered Through Cracking")) # non-blank
-        print("|{:^10}|{:^51}|".format(perc_total_cracked, "Percent of Passwords Cracked"))
-        print("|{:^10}|{:^51}|".format(perc_uniq_cracked, "Percent of Unique Passwords Cracked"))
-        print("|{:^10}|{:^51}|".format(num_das, "Members of Domain Admins"))
-        print("|{:^10}|{:^51}|".format(query_counts["Domain Admin accounts cracked"], "Domain Admin Passwords Cracked"))
-        print("|{:^10}|{:^51}|".format(num_das, "Members of Enterprise Admins"))
-        print("|{:^10}|{:^51}|".format(query_counts["Enterprise Admin accounts cracked"], "Enterprise Admin Passwords Cracked"))
-        print("|{:^10}|{:^51}|".format(non_blank_lm, "LM Hashes (Non-Blank)"))
-        print("|{:^10}|{:^51}|".format(uniq_lm, "Unique LM Hashes (Non-Blank)"))
-        print(" " + "="*62)
+        print("{:^82}".format("Overall Statistics"))
+        print(" " + "="*86)
+        print("|{:^10}|{:^75}|".format("Count", "Description"))
+        print(" " + "="*86)
+        print("|{:^10}|{:^75}|".format(num_pass_hashes, "Password Hashes"))
+        print("|{:^10}|{:^75}|".format(num_uniq_hash, "Unique Password Hashes"))
+        print("|{:^10}|{:^75}|".format(num_cracked, "Passwords Discovered Through Cracking")) # non-blank
+        print("|{:^10}|{:^75}|".format(perc_total_cracked, "Percent of Passwords Cracked"))
+        print("|{:^10}|{:^75}|".format(perc_uniq_cracked, "Percent of Unique Passwords Cracked"))
+        print("|{:^10}|{:^75}|".format(non_blank_lm, "LM Hashes (Non-Blank)"))
+        print("|{:^10}|{:^75}|".format(uniq_lm, "Unique LM Hashes (Non-Blank)"))
+
+        for item in output_data:
+            print("|{:^10}|{:^75}|".format(len(item['enabled']),item['label'] + " - Enabled"))
+            print("|{:^10}|{:^75}|".format(len(item['disabled']),item['label'] + " - Disabled"))
+
+        # print("|{:^10}|{:^51}|".format(num_das, "Members of Domain Admins"))
+        # print("|{:^10}|{:^51}|".format(query_counts["Domain Admin accounts cracked"], "Domain Admin Passwords Cracked"))
+        # print("|{:^10}|{:^51}|".format(num_das, "Members of Enterprise Admins"))
+        # print("|{:^10}|{:^51}|".format(query_counts["Enterprise Admin accounts cracked"], "Enterprise Admin Passwords Cracked"))
+
+        print(" " + "="*86)
         print("")
         print("")
-        print("{:^64}".format("Password Length Stats"))
-        print(" " + "="*62)
-        print("|{:^10}|{:^51}|".format("Count", "Description"))
-        print(" " + "="*62)
+        print("{:^82}".format("Password Length Stats"))
+        print(" " + "="*86)
+        print("|{:^10}|{:^75}|".format("Count", "Description"))
+        print(" " + "="*86)
         for pw_len in sorted(password_lengths.keys(), reverse=True):
-            print("|{:^10}|{:^51}|".format(password_lengths[pw_len], "{} Characters".format(pw_len)))
-        print(" " + "="*62)
+            print("|{:^10}|{:^75}|".format(password_lengths[pw_len], "{} Characters".format(pw_len)))
+        print(" " + "="*86)
         print("")
         print("")
-        print("{:^64}".format("Password Reuse Stats (Top 10%)"))
-        print(" " + "="*62)
-        print("|{:^10}|{:^51}|".format("Count", "Description"))
-        print(" " + "="*62)
+        print("{:^82}".format("Password Reuse Stats (Top 10%)"))
+        print(" " + "="*86)
+        print("|{:^10}|{:^75}|".format("Count", "Description"))
+        print(" " + "="*86)
         for i in range(0, math.ceil( len(cracked) * 0.10 )):
-            print("|{:^10}|{:^51}|".format(cracked[i][1], sanitize(args, cracked[i][0])))
-        print(" " + "="*62)
+            print("|{:^10}|{:^75}|".format(cracked[i][1], sanitize(args, cracked[i][0])))
+        print(" " + "="*86)
         print("")
         print("")
 
