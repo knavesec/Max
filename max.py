@@ -11,7 +11,6 @@ from itertools import zip_longest
 import csv
 import binascii
 import math
-import traceback
 
 # option to hardcode URL & URI
 global_url = "http://127.0.0.1:7474"
@@ -650,7 +649,6 @@ def dpat_func(args):
 
         except Exception as f:
             print("[-] Error, {}".format(f))
-            print(traceback.print_exc())
             return
 
         print("[*] BloodHound data queried successfully, {} NTDS users mapped to BH data".format(len(ntds_parsed)))
