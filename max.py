@@ -523,6 +523,11 @@ def dpat_func(args):
     else:
         print("Error: Need potfile")
         return
+
+    if (not args.csv and not args.html):
+        print("[-] Error, --outputfile requires --csv and/or --html type output flags")
+        return
+
     try:
         print("[+] Processing NTDS")
         ntds_parsed = []
@@ -618,50 +623,124 @@ def dpat_func(args):
 
     queries = [
         {
-            'query' : "MATCH (g:Group) WHERE g.objectid ENDS WITH '-512' MATCH (u:User {cracked:true})-[r:MemberOf*1..]->(g) RETURN DISTINCT u.name,u.objectid",
+            'query' : "MATCH (u:User {cracked:true}) RETURN DISTINCT u.name,u.objectid,u.enabled",
+            'label' : "All user accounts cracked"
+        },
+        {
+            'query' : "MATCH (g:Group) WHERE g.objectid ENDS WITH '-512' MATCH (u:User {cracked:true})-[r:MemberOf*1..]->(g) RETURN DISTINCT u.name,u.objectid,u.enabled",
             'label' : "Domain Admin accounts cracked"
         },
         {
-            'query' : "MATCH (g:Group) WHERE g.objectid ENDS WITH '-519' MATCH (u:User {cracked:true})-[r:MemberOf*1..]->(g) RETURN DISTINCT u.name,u.objectid",
+            'query' : "MATCH (g:Group) WHERE g.objectid ENDS WITH '-519' MATCH (u:User {cracked:true})-[r:MemberOf*1..]->(g) RETURN DISTINCT u.name,u.objectid,u.enabled",
             'label' : "Enterprise Admin accounts cracked"
         },
         {
-            'query' : "MATCH (g:Group) WHERE g.objectid ENDS WITH '-544' MATCH (u:User {cracked:true})-[r:MemberOf]->(g) RETURN DISTINCT u.name,u.objectid",
+            'query' : "MATCH (g:Group) WHERE g.objectid ENDS WITH '-544' MATCH (u:User {cracked:true})-[r:MemberOf]->(g) RETURN DISTINCT u.name,u.objectid,u.enabled",
             'label' : "Administrator group member accounts cracked"
         },
         {
-            'query' : "MATCH (u:User {cracked:true,enabled:true}) RETURN DISTINCT u.name,u.objectid",
-            'label' : "Enabled accounts cracked"
-        },
-        {
-            'query' : "MATCH (u:User {cracked:true,enabled:false}) RETURN DISTINCT u.name,u.objectid",
-            'label' : "Disabled accounts cracked"
-        },
-        {
-            'query' : "MATCH (u:User {cracked:true,hasspn:true}) RETURN DISTINCT u.name,u.objectid",
+            'query' : "MATCH (u:User {cracked:true,hasspn:true}) RETURN DISTINCT u.name,u.objectid,u.enabled",
             'label' : "Kerberoastable users cracked"
         },
         {
-            'query' : "MATCH (u:User {cracked:true,unconstraineddelegation:true}) RETURN DISTINCT u.name,u.objectid",
+            'query' : "MATCH (u:User {cracked:true,dontreqpreauth:true}) RETURN DISTINCT u.name,u.objectid,u.enabled",
+            'label' : "Accounts not requiring Kerberos Pre-Authentication cracked"
+        },
+        {
+            'query' : "MATCH (u:User {cracked:true,unconstraineddelegation:true}) RETURN DISTINCT u.name,u.objectid,u.enabled",
             'label' : "Unconstrained delegation accounts cracked"
         },
         {
-            "query" : "MATCH (m:User {cracked:true}),(n {highvalue:true}),p=shortestPath((m)-[r*1..]->(n)) WHERE NONE (r IN relationships(p) WHERE type(r)= 'GetChanges') AND NONE (r in relationships(p) WHERE type(r)='GetChangesAll') AND NOT m=n RETURN DISTINCT m.name,m.objectid",
+            "query" : "MATCH (u:User {cracked:true}),(n {highvalue:true}),p=shortestPath((u)-[r*1..]->(n)) WHERE NONE (r IN relationships(p) WHERE type(r)= 'GetChanges') AND NONE (r in relationships(p) WHERE type(r)='GetChangesAll') AND NOT u=n RETURN DISTINCT u.name,u.objectid,u.enabled",
             "label" : "Accounts with paths to High Value Targets"
         }
     ]
+
+    """
+    [
+        {
+            'label' : "query title",
+            'enabled' : "list of enabled users related to the query"
+            'disabled' : "list of disabled users related to the query"
+        }
+    ]
+    """
+    output_data = []
 
     for search_value in queries:
 
         query = search_value['query']
         label = search_value['label']
-        print('\n' + label + '\n')
+        print("[+] Querying for \"" + label + "\"")
+        dat = { 'label' : label }
+        dat['enabled'] = []
+        dat['disabled'] = []
 
         r = do_query(args,query)
         resp = json.loads(r.text)['results'][0]['data']
         for entry in resp:
-            print(entry['row'][0])
+            # print(entry['row'][0])
+            if entry['row'][2]:
+                dat['enabled'].append(entry['row'][0])
+            else:
+                dat['disabled'].append(entry['row'][0])
 
+        output_data.append(dat)
+
+    if args.csv:
+
+        full_data = []
+        for item in output_data:
+            label = item['label']
+            enable_label = label + " - Enabled"
+            disable_label = label + " - Disabled"
+            item['enabled'].insert(0,enable_label)
+            item['disabled'].insert(0,disable_label)
+
+            full_data.append(item['enabled'])
+            full_data.append(item['disabled'])
+
+        export_data = zip_longest(*full_data, fillvalue='')
+        filename = args.outputfile + ".csv" #node_name.replace(" ","_") + ".csv"
+        with open(filename,'w', encoding='utf-8', newline='') as file:
+            wr = csv.writer(file)
+            wr.writerows(export_data)
+        file.close()
+
+    if args.html:
+        print("[-] Sorry, HTML storage not supported yet :/")
+
+
+        css_styling = """
+        table, th, td {
+            border: 1px solid black;
+            border-collapse: collapse;
+            text-align: center;
+        }
+
+        th, td {
+            padding: 5px;
+        }
+
+        th {
+            border-bottom-width: 2px;
+        }
+
+        body {
+            justify-content: center;
+        }
+
+        table {
+            box-shadow: 0 7px 8px -4px rgba(0,0,0,.2),0 12px 17px 2px rgba(0,0,0,.14),0 5px 22px 4px rgba(0,0,0,.12)!important;
+            margin-top: 30px;
+        }
+
+        tr:nth-child(even) {
+            background: #d1d3d2;
+        }
+        """
+
+        # print(css_styling)
 
     # clear the "cracked" tag
     clear_query = "MATCH (u:User {cracked:true}) REMOVE u.cracked"
@@ -792,6 +871,9 @@ def main():
     dpat.add_argument("-n","--ntds",dest="ntdsfile",default="",required=True,help="NTDS file name")
     dpat.add_argument("-p","--pot",dest="potfile",default="",required=True,help="Hashcat potfile")
     dpat.add_argument("-s","--sanitize",dest="sanitize",action="store_true",required=False,help="Sanitize the report by partially redacting passwords and hashes")
+    dpat.add_argument("-o","--outputfile",dest="outputfile",default="",required=True,help="Output filename to store results")
+    dpat.add_argument("--csv",dest="csv",action="store_true",required=False,help="Store the output in a CSV format")
+    dpat.add_argument("--html",dest="html",action="store_true",required=False,help="Store the output in HTML format")
 
     args = parser.parse_args()
 
