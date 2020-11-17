@@ -11,6 +11,7 @@ from itertools import zip_longest
 import csv
 import binascii
 import math
+import traceback
 
 # option to hardcode URL & URI
 global_url = "http://127.0.0.1:7474"
@@ -595,8 +596,8 @@ def dpat_func(args):
                 if (line[0] == user[4]):
                     # found in potfile, cracked
                     if ("$HEX[" in line[1]):
-                        print("found $HEX[]")
-                        user[5] = binascii.unhexlify( str( line[1].split("[")[1].replace("]", "") ) )
+                        print("[!] found $HEX[], stripping and unpacking")
+                        user[5] = binascii.unhexlify( str( line[1].split("[")[1].replace("]", "") ) ).decode("utf-8")
                     else:
                         if (user[4] == "31d6cfe0d16ae931b73c59d7e0c089c0"):
                             user[5] = ""
@@ -631,12 +632,15 @@ def dpat_func(args):
 
                 except Exception as g:
                     # user doesn't have an entry in AD, disregard and cleanup stats
-                    curent_lm = ntds_cracked[i][3]
-                    if (lm_hashes[curent_lm] != 1):
-                        lm_hashes[curent_lm] -= 1
+                    current_lm = ntds_cracked[i][3]
+                    if (current_lm == "aad3b435b51404eeaad3b435b51404ee"):
+                        pass
+                    elif (lm_hashes[current_lm] != 1):
+                        lm_hashes[current_lm] -= 1
                     else:
-                        lm_hashes.pop(curent_lm, None)
-                    curent_nt = ntds_cracked[i][3]
+                        lm_hashes.pop(current_lm, None)
+#                    if (
+                    curent_nt = ntds_cracked[i][4]
                     if (nt_hashes[curent_nt] != 1):
                         nt_hashes[curent_nt] -= 1
                     else:
@@ -646,6 +650,7 @@ def dpat_func(args):
 
         except Exception as f:
             print("[-] Error, {}".format(f))
+            print(traceback.print_exc())
             return
 
         print("[*] BloodHound data queried successfully, {} NTDS users mapped to BH data".format(len(ntds_parsed)))
@@ -754,8 +759,9 @@ def dpat_func(args):
 
     # Get Password (Complexity) Stats
     # sort from most reused to least reused dict to list of tuples 
-    cracked = sorted(cracked.items(), reverse=True)
-
+    #print(cracked)
+    cracked = sorted(cracked.items(), key=lambda x: x[1], reverse=True)
+    #print(cracked)
     if args.csv:
 
         full_data = []
