@@ -12,6 +12,7 @@ import csv
 import binascii
 import math
 import os
+import numpy
 try:
     import html as htmllib
 except ImportError:
@@ -545,7 +546,7 @@ def dpat_func(args):
     try:
         print("[+] Processing NTDS")
         ntds_parsed = []
-        ntds_cracked = []
+        # ntds_cracked = []
         for line in ntds:
             if ":::" not in line or '$' in line: #filters out other lines in ntds/computer obj
                 continue
@@ -567,8 +568,8 @@ def dpat_func(args):
             to_append.append(line[2])
             to_append.append(line[3])
             if (line[3] not in nt_hashes):
-                nt_hashes[line[3]] = 0
-            nt_hashes[line[3]] += 1
+                nt_hashes[line[3]] = [line[0]]
+            nt_hashes[line[3]].append(line[0])
             to_append.append(None)
             ntds_parsed.append(to_append)
         #print(ntds_parsed)
@@ -602,40 +603,44 @@ def dpat_func(args):
                     if (user[5] not in cracked):
                         cracked[user[5]] = 0
                     cracked[user[5]] += 1
-                    ntds_cracked.append(user)
+                    # ntds_cracked.append(user)
 
         try:
-            for i in range(0,len(ntds_cracked)):
+            print('[+] Mapping NTDS users to BloodHound data')
+            for i in range(0,len(ntds_parsed)):
                 # [ username, domain, rid, LM, NT, plaintext||None, bh username, sid]
                 # try query1 to see if we can resolve the users based off solely username+domain
                 try:
-                    user = ntds_cracked[i]
-                    query1 = "match (u:User) where u.name='{username}' set u.cracked=true return u.name,u.objectid".format(username=str(user[0].upper().strip() + "@" + user[1].upper().strip()))
+                    user = ntds_parsed[i]
+                    crack_query = ""
+                    if user[5] is not None:
+                        crack_query = 'SET u.cracked=true'
+                    query1 = "MATCH (u:User) WHERE u.name='{username}' {crack_query} RETURN u.name,u.objectid".format(username=str(user[0].upper().strip() + "@" + user[1].upper().strip()), crack_query=crack_query)
                     r = do_query(args,query1)
                     bh_users = json.loads(r.text)['results'][0]['data']
                     if bh_users == []:
                         # try matching based off username and rid
-                        query2 = "match (u:User) where u.name starts with '{username}@' and u.objectid ends with '-{rid}' set u.cracked=true return u.name,u.objectid".format(username=user[0].upper(), rid=user[2].upper())
+                        query2 = "MATCH (u:User) WHERE u.name STARTS WITH '{username}@' AND u.objectid ENDS WITH '-{rid}' {crack_query} RETURN u.name,u.objectid".format(username=user[0].upper(), rid=user[2].upper(), crack_query=crack_query)
                         r = do_query(args,query2)
                         bh_users = json.loads(r.text)['results'][0]['data']
 
                     bh_username = bh_users[0]['row'][0]
                     bh_sid = bh_users[0]['row'][1]
 
-                    ntds_cracked[i].append(bh_username)
+                    ntds_parsed[i].append(bh_username)
 
-                    cracked_user_info[bh_sid] = ntds_cracked[i]
+                    cracked_user_info[bh_sid] = ntds_parsed[i]
 
                 except Exception as g:
                     # user doesn't have an entry in AD, disregard and cleanup stats
-                    current_lm = ntds_cracked[i][3]
+                    current_lm = ntds_parsed[i][3]
                     if (current_lm == "aad3b435b51404eeaad3b435b51404ee"):
                         pass
                     elif (lm_hashes[current_lm] != 1):
                         lm_hashes[current_lm] -= 1
                     else:
                         lm_hashes.pop(current_lm, None)
-                    curent_nt = ntds_cracked[i][4]
+                    curent_nt = ntds_parsed[i][4]
                     if (nt_hashes[curent_nt] != 1):
                         nt_hashes[curent_nt] -= 1
                     else:
@@ -644,9 +649,9 @@ def dpat_func(args):
 
 
         except Exception as f:
-            print("[-] Error, {}".format(f))
+            print("[-] Error: {}".format(f))
             return
-
+        # print(cracked_user_info)
         print("[*] BloodHound data queried successfully, {} NTDS users mapped to BH data".format(len(ntds_parsed)))
 
     except Exception as e:
@@ -655,19 +660,19 @@ def dpat_func(args):
 
     if args.passwd:
         print("[*] Searching for users with password {}".format(args.passwd))
-        for user in ntds_cracked:
-            if (user[5] == args.passwd):
-                if (user[1] != ''):
-                    print("{}".format(user[6]))
+        for user in cracked_user_info:
+            if (cracked_user_info[user][5] == args.passwd):
+                if (cracked_user_info[user][1] != ''):
+                    print("{}".format(cracked_user_info[user][6]))
                 else:
-                    print("{}".format(user[0]))
+                    print("{}".format(cracked_user_info[user][0]))
 
         return
     if args.usern:
-        for user in ntds_cracked:
+        for user in cracked_user_info:
             if (user[1] != ''):
-                if (user[6] == args.usern.upper()):
-                    print("{}:{}".format(user[6], sanitize(args, user[5])))
+                if (cracked_user_info[userRecord][6] == args.usern.upper()):
+                    print("{}:{}".format(cracked_user_info[user][6], sanitize(args, cracked_user_info[user][5])))
             else:
                 continue
                 #if (user[0].upper() == args.usern.split("@")[0]):
@@ -676,6 +681,10 @@ def dpat_func(args):
         return
 
     queries = [
+        {
+            'query' : "MATCH (u:User) RETURN DISTINCT u.name,u.objectid,u.enabled",
+            'label' : "All User Accounts"
+        },
         {
             'query' : "MATCH (u:User {cracked:true}) RETURN DISTINCT u.name,u.objectid,u.enabled",
             'label' : "All User Accounts Cracked"
@@ -686,7 +695,7 @@ def dpat_func(args):
         },
         {
             'query' : "MATCH (g:Group) WHERE g.objectid ENDS WITH '-512' MATCH (u:User {cracked:true})-[r:MemberOf*1..]->(g) RETURN DISTINCT u.name,u.objectid,u.enabled",
-            'label' : "Domain Admin Accounts Cracked"
+            'label' : "Domain Admin Members Cracked"
         },
         {
             'query' : "MATCH (g:Group) WHERE g.objectid ENDS WITH '-519' MATCH (u:User)-[r:MemberOf*1..]->(g) RETURN DISTINCT u.name,u.objectid,u.enabled",
@@ -718,7 +727,7 @@ def dpat_func(args):
         },
         {
             "query" : "MATCH (u:User {cracked:true}),(n {highvalue:true}),p=shortestPath((u)-[r*1..]->(n)) WHERE NONE (r IN relationships(p) WHERE type(r)= 'GetChanges') AND NONE (r in relationships(p) WHERE type(r)='GetChangesAll') AND NOT u=n RETURN DISTINCT u.name,u.objectid,u.enabled",
-            "label" : "Accounts With Paths To High Value Targets"
+            "label" : "Accounts With Paths To High Value Targets Cracked"
         }
     ]
 
@@ -731,7 +740,7 @@ def dpat_func(args):
         }
     ]
     """
-    output_data = []
+    query_output_data = []
 
     for search_value in queries:
 
@@ -748,21 +757,56 @@ def dpat_func(args):
         resp = json.loads(r.text)['results'][0]['data']
         for entry in resp:
             # print(entry['row'][0])
-            query_counts[label] += 1
+            query_counts[label] += 1 #TODO
+            status_flag = "disabled"
             if entry['row'][2]:
-                dat['enabled'].append(entry['row'][0])
-            else:
-                dat['disabled'].append(entry['row'][0])
+                status_flag = "enabled"
 
-        output_data.append(dat)
+            if "cracked" in label.lower():
+                try:
+                    length = ''
+                    if cracked_user_info[entry['row'][1]][5] != None:
+                        length = len(cracked_user_info[entry['row'][1]][5])
+                    full_uname = '/'.join(filter(None, [cracked_user_info[entry['row'][1]][1], cracked_user_info[entry['row'][1]][0]]))
+                    dat[status_flag].append([full_uname, cracked_user_info[entry['row'][1]][5], length, cracked_user_info[entry['row'][1]][4]])
+                #     else:
+                #         dat['disabled'].append(cracked_user_info[entry['row'][1]])
+                except:
+                    pass
+            else:
+                try:
+                    full_uname = '/'.join(filter(None, [cracked_user_info[entry['row'][1]][1], cracked_user_info[entry['row'][1]][0]]))
+                    all_hashes_shared = ', '.join(nt_hashes[cracked_user_info[entry['row'][1]][4]])
+                    if len(nt_hashes[cracked_user_info[entry['row'][1]][4]]) > 30:
+                        all_hashes_shared = "Shared Hash List > 30"
+                    dat[status_flag].append( [full_uname, cracked_user_info[entry['row'][1]][4], all_hashes_shared, len(nt_hashes[cracked_user_info[entry['row'][1]][4]]), cracked_user_info[entry['row'][1]][5] ])
+                except:
+                    pass
+
+        if "cracked" in label.lower():
+            dat['columns'] = ["Username", "Password", "Password Length", "NT Hash"]
+        else:
+            dat['columns'] = ["Username", "NT Hash", "Users Sharing this Hash", "Share Count", "Password"]
+
+        query_output_data.append(dat)
 
     # clear the "cracked" tag
     clear_query = "MATCH (u:User {cracked:true}) REMOVE u.cracked"
     do_query(args,clear_query)
 
-
+    # print(ntds_parsed)
     # Get the Overall Stats ready
     num_pass_hashes = len(ntds_parsed)
+    num_pass_hashes_list = []
+    for user in ntds_parsed:
+        full_uname = '/'.join(filter(None, [user[1], user[0]]))
+        length = ''
+        if user[5] != None:
+            length = len(user[5])
+        num_pass_hashes_list.append([full_uname, user[5], length, user[4]])
+    # num_pass_hashes_list = numpy.array(num_pass_hashes_list)
+    # num_pass_hashes_list = num_pass_hashes_list[numpy.argsort(num_pass_hashes_list[:,2])]
+
     num_uniq_hash = len(nt_hashes)
     num_cracked = sum(cracked.values())
     num_uniq_cracked = len(cracked)
@@ -783,7 +827,7 @@ def dpat_func(args):
     # print(ntds_parsed)
 
     stats = [
-        [num_pass_hashes, "Password Hashes"], #, ntds_parsed],
+        [num_pass_hashes, "Password Hashes", ["NTDS Username", "Password", "Password Length", "NT Hash"], num_pass_hashes_list], #, ntds_parsed],
         [num_uniq_hash, "Unique Password Hashes"],
         [num_cracked, "Passwords Discovered Through Cracking"],
         [perc_total_cracked, "Percent of Passwords Cracked"],
@@ -816,7 +860,7 @@ def dpat_func(args):
 
         full_data = []
 
-        for item in output_data:
+        for item in query_output_data:
             label = item['label']
             enable_label = label + " - Enabled"
             disable_label = label + " - Disabled"
@@ -834,16 +878,15 @@ def dpat_func(args):
         file.close()
         print("[+] All data written to {}.csv".format(args.outputfile))
 
-    # use if specifically so you can output both html & csv on the same run
+    # use "if" specifically so you can output both html & csv on the same run
     # This code heavily modified from the original DPAT tool, credit where it's due
     if args.html:
-        print("[-] Sorry, HTML storage not supported yet :/")
 
         if not os.path.exists(args.outputfile):
             os.makedirs(args.outputfile)
 
         filebase = args.outputfile + "/"
-        filename_report = "report.html"
+        filename_report = "Report.html"
 
         # write report.css
         css_styling =  ""
@@ -902,7 +945,7 @@ def dpat_func(args):
                     for column in line:
                         if column is not None:
                             col_data = column
-                            if ((("Password") in headers[col_num] and not "Password Length" in headers[col_num]) or ("Hash" in headers[col_num]) or ("History" in headers[col_num])):
+                            if ((("Password") in headers[col_num] and not "Password Length" in headers[col_num]) or ("Hash" in headers[col_num] and not "Users Sharing this Hash" in headers[col_num]) or ("History" in headers[col_num])):
                                 col_data = sanitize(args, column)
                             if col_num != col_to_not_escape:
                                 col_data = htmllib.escape(str(col_data))
@@ -924,19 +967,37 @@ def dpat_func(args):
         summary_table = []
         summary_table_headers = ("Count", "Description", "More Info")
 
+        print("[+] Writing HTML files")
+
         for stat in stats:
 
             if len(stat) == 2:
-
                 summary_table.append((stat[0], stat[1],""))
 
+            else:
+                hbt = HtmlBuilder()
+                hbt.add_table_to_html(stat[3], stat[2])
+                filename = hbt.write_html_report(filebase, ''.join([stat[1].replace(' ','_'),".html"]))
+                summary_table.append((stat[0], stat[1],"<a href=\"" + filename + "\">Details</a>"))
 
-                # list = [["uname", "pass", "pwd len", "nt", "only lm cracked"]]
-                #
-                # hbt = HtmlBuilder()
-                # hbt.add_table_to_html(list, ["Username", "Password", "Password Length", "NT Hash", "Only LM Cracked"])
-                # filename = hbt.write_html_report(filebase, "all hashes.html")
-                # summary_table.append((5, "Password Hashes","<a href=\"" + filename + "\">Details</a>"))
+        for item in query_output_data:
+
+            # if 'cracked' in item['label'].lower():
+            cols = item['columns']
+            cols.append("Status")
+
+            all_entries = []
+            for entry in item['enabled']:
+                entry.append('Enabled')
+                all_entries.append(entry)
+            for entry in item['disabled']:
+                entry.append('Disabled')
+                all_entries.append(entry)
+
+            hbt = HtmlBuilder()
+            hbt.add_table_to_html(all_entries, cols)
+            filename = hbt.write_html_report(filebase, ''.join([item['label'].replace(' ','_'),".html"]))
+            summary_table.append((len(all_entries), item['label'],"<a href=\"" + filename + "\">Details</a>"))
 
 
         hb.add_table_to_html(summary_table, summary_table_headers, 2)
@@ -966,7 +1027,7 @@ def dpat_func(args):
         for set in stats:
              print("|{:^10}|{:^75}|".format(set[0], set[1]))
 
-        for item in output_data:
+        for item in query_output_data:
             print("|{:^10}|{:^75}|".format(len(item['enabled']),item['label'] + " - Enabled"))
             print("|{:^10}|{:^75}|".format(len(item['disabled']),item['label'] + " - Disabled"))
 
