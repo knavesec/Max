@@ -568,11 +568,10 @@ def dpat_func(args):
             to_append.append(line[2])
             to_append.append(line[3])
             if (line[3] not in nt_hashes):
-                nt_hashes[line[3]] = [line[0]]
+                nt_hashes[line[3]] = []
             nt_hashes[line[3]].append(line[0])
             to_append.append(None)
             ntds_parsed.append(to_append)
-        #print(ntds_parsed)
 
         print("[+] Processing Potfile")
         # password stats like counting reused cracked passwords
@@ -580,8 +579,9 @@ def dpat_func(args):
             # LM found
             if (user[3] != "aad3b435b51404eeaad3b435b51404ee"):
                 if (user[3] not in lm_hashes):
-                    lm_hashes[user[3]] = 0
-                lm_hashes[user[3]] += 1
+                    lm_hashes[user[3]] = []
+                full_uname = '/'.join(filter(None, [user[1], user[0]]))
+                lm_hashes[user[3]].append(full_uname)
 
             for line in potfile:
                 line = line.replace("\r", "").replace("\n", "")
@@ -603,7 +603,6 @@ def dpat_func(args):
                     if (user[5] not in cracked):
                         cracked[user[5]] = 0
                     cracked[user[5]] += 1
-                    # ntds_cracked.append(user)
 
         try:
             print('[+] Mapping NTDS users to BloodHound data')
@@ -633,33 +632,37 @@ def dpat_func(args):
 
                 except Exception as g:
                     # user doesn't have an entry in AD, disregard and cleanup stats
-                    current_lm = ntds_parsed[i][3]
-                    if (current_lm == "aad3b435b51404eeaad3b435b51404ee"):
-                        pass
-                    elif (lm_hashes[current_lm] != 1):
-                        lm_hashes[current_lm] -= 1
-                    else:
-                        lm_hashes.pop(current_lm, None)
-                    curent_nt = ntds_parsed[i][4]
-                    if (nt_hashes[curent_nt] != 1):
-                        nt_hashes[curent_nt] -= 1
-                    else:
-                        nt_hashes.pop(curent_nt, None)
+                    # current_lm = ntds_parsed[i][3]
+                    # if (current_lm == "aad3b435b51404eeaad3b435b51404ee"):
+                    #     pass
+                    # elif (lm_hashes[current_lm] != 1):
+                    #     lm_hashes[current_lm] -= 1
+                    # else:
+                    #     lm_hashes.pop(current_lm, None)
+                    # curent_nt = ntds_parsed[i][4]
+                    # if (nt_hashes[curent_nt] != 1):
+                    #     nt_hashes[curent_nt] -= 1
+                    # else:
+                    #     nt_hashes.pop(curent_nt, None)
                     pass
 
 
         except Exception as f:
             print("[-] Error: {}".format(f))
             return
-        # print(cracked_user_info)
-        print("[*] BloodHound data queried successfully, {} NTDS users mapped to BH data".format(len(ntds_parsed)))
+
+        print("[+] BloodHound data queried successfully, {} NTDS users mapped to BH data".format(len(ntds_parsed)))
 
     except Exception as e:
         print("[-] Error, {}".format(e))
         return
 
+    ###
+    ### Searching for specific user/password
+    ###
+
     if args.passwd:
-        print("[*] Searching for users with password {}".format(args.passwd))
+        print("[+] Searching for users with password {}".format(args.passwd))
         for user in cracked_user_info:
             if (cracked_user_info[user][5] == args.passwd):
                 if (cracked_user_info[user][1] != ''):
@@ -679,6 +682,10 @@ def dpat_func(args):
                 #    print(sanitize(args, user[5]))
 
         return
+
+    ###
+    ### Automated Cypher Queries for standard stuff, outputting users
+    ###
 
     queries = [
         {
@@ -726,8 +733,28 @@ def dpat_func(args):
             'label' : "Unconstrained Delegation Accounts Cracked"
         },
         {
+            "query" : "MATCH (u:User {cracked:true}),(n {unconstraineddelegation:true}),p=shortestPath((u)-[r*1..]->(n)) WHERE NONE (r IN relationships(p) WHERE type(r)= 'GetChanges') AND NONE (r in relationships(p) WHERE type(r)='GetChangesAll') AND NOT u=n RETURN DISTINCT u.name,u.objectid,u.enabled",
+            "label" : "Accounts With Paths To Unconstrained Delegation Objects Cracked"
+        },
+        {
             "query" : "MATCH (u:User {cracked:true}),(n {highvalue:true}),p=shortestPath((u)-[r*1..]->(n)) WHERE NONE (r IN relationships(p) WHERE type(r)= 'GetChanges') AND NONE (r in relationships(p) WHERE type(r)='GetChangesAll') AND NOT u=n RETURN DISTINCT u.name,u.objectid,u.enabled",
             "label" : "Accounts With Paths To High Value Targets Cracked"
+        },
+        {
+            "query" : "MATCH (u:User {cracked:true}),p=shortestPath((u)-[r:AdminTo|MemberOf*1..6]->(n)) WHERE NOT u=n RETURN DISTINCT u.name,u.objectid,u.enabled",
+            "label" : "Accounts With Local Admin Rights Cracked"
+        },
+        {
+            "query" : "MATCH (g:Group),p=shortestPath((g)-[r:AllExtendedRights|AddMember|ForceChangePassword|GenericAll|GenericWrite|Owns|WriteDacl|WriteOwner|ReadLAPSPassword|ReadGMSAPassword|CanRDP|CanPSRemote|ExecuteDCOM|AllowedToDelegate|AddAllowedToAct|AllowedToAct|SQLAdmin|HasSIDHistory]->(n)) WHERE NOT g=n WITH COLLECT(g) AS groups UNWIND groups AS g2 MATCH (u:User {cracked:true}),p2=(u)-[r:MemberOf*1..]->(g2) RETURN DISTINCT u.name,u.objectid,u.enabled",
+            "label" : "Accounts With Controlling Privileges Cracked"
+        },
+        {
+            "query" : "MATCH (u:User {cracked:true}) WHERE u.pwdlastset < (datetime().epochseconds - (365 * 86400)) AND NOT u.pwdlastset IN [-1.0, 0.0] RETURN DISTINCT u.name,u.objectid,u.enabled",
+            "label" : "Accounts With Passwords Set > 1yr Ago Cracked"
+        },
+        {
+            "query" : "MATCH (u:User {cracked:true,pwdneverexpires:true}) RETURN DISTINCT u.name,u.objectid,u.enabled",
+            "label" : "Accounts With Passwords That Never Expire Cracked"
         }
     ]
 
@@ -756,7 +783,6 @@ def dpat_func(args):
         r = do_query(args,query)
         resp = json.loads(r.text)['results'][0]['data']
         for entry in resp:
-            # print(entry['row'][0])
             query_counts[label] += 1 #TODO
             status_flag = "disabled"
             if entry['row'][2]:
@@ -790,12 +816,25 @@ def dpat_func(args):
 
         query_output_data.append(dat)
 
-    # clear the "cracked" tag
-    clear_query = "MATCH (u:User {cracked:true}) REMOVE u.cracked"
-    do_query(args,clear_query)
+    ###
+    ### Get the Overall Stats ready
+    ###
 
-    # print(ntds_parsed)
-    # Get the Overall Stats ready
+    print("[+] Querying for Group Statistics")
+    percent_cracked_groups = []
+    query = "MATCH (u:User {cracked:true}),(g:Group) MATCH (u)-[r1:MemberOf*1..]->(g) WITH COLLECT(g) AS groups UNWIND groups AS g2 MATCH (u2:User),p2=(u2)-[r2:MemberOf]->(g2),p3=(u3:User {cracked:true})-[r3:MemberOf]->(g2) RETURN g2.name, COUNT(DISTINCT(u3))*100/COUNT(DISTINCT(u2)), COUNT(DISTINCT(u3.name)), COUNT(DISTINCT(u2.name)) ORDER BY COUNT(DISTINCT(u3))*100/COUNT(DISTINCT(u2)) DESC"
+    r = do_query(args,query)
+    resp = json.loads(r.text)['results'][0]['data']
+    for entry in resp:
+        group_name = entry['row'][0]
+        percent = entry['row'][1]
+        cracked_users = entry['row'][2]
+        total_users = entry['row'][3]
+        percent_cracked_groups.append([group_name, percent, cracked_users, total_users])
+
+    percent_cracked_groups_number = len(percent_cracked_groups)
+
+    print("[+] Generating Overall Statistics")
     num_pass_hashes = len(ntds_parsed)
     num_pass_hashes_list = []
     for user in ntds_parsed:
@@ -804,8 +843,6 @@ def dpat_func(args):
         if user[5] != None:
             length = len(user[5])
         num_pass_hashes_list.append([full_uname, user[5], length, user[4]])
-    # num_pass_hashes_list = numpy.array(num_pass_hashes_list)
-    # num_pass_hashes_list = num_pass_hashes_list[numpy.argsort(num_pass_hashes_list[:,2])]
 
     num_uniq_hash = len(nt_hashes)
     num_cracked = sum(cracked.values())
@@ -819,22 +856,24 @@ def dpat_func(args):
         perc_uniq_cracked = 00.00
 
     # get number of DAs to match DPAT, assume connection works since we mapped all users already
-    num_das = len(json.loads(do_query(args, "MATCH p=(n:User)-[r:MemberOf*1..]->(g:Group) WHERE g.objectid ENDS WITH '-512' RETURN DISTINCT n.name").text)['results'][0]['data'])
-    num_eas = len(json.loads(do_query(args, "MATCH p=(n:User)-[r:MemberOf*1..]->(g:Group) WHERE g.objectid ENDS WITH '-519' RETURN DISTINCT n.name").text)['results'][0]['data'])
-    non_blank_lm = sum(lm_hashes.values())
+    non_blank_lm = 0 #sum(lm_hashes.values())
     uniq_lm = len(lm_hashes)
+    lm_hash_list = []
+    for lm_hash in lm_hashes:
+        non_blank_lm += len(lm_hashes[lm_hash])
+        for user in lm_hashes[lm_hash]:
+            lm_hash_list.append([user, lm_hash, len(lm_hashes[lm_hash])])
 
-    # print(ntds_parsed)
-
-    stats = [
-        [num_pass_hashes, "Password Hashes", ["NTDS Username", "Password", "Password Length", "NT Hash"], num_pass_hashes_list], #, ntds_parsed],
-        [num_uniq_hash, "Unique Password Hashes"],
-        [num_cracked, "Passwords Discovered Through Cracking"],
-        [perc_total_cracked, "Percent of Passwords Cracked"],
-        [perc_uniq_cracked, "Percent of Unique Passwords Cracked"],
-        [non_blank_lm, "LM Hashes (Non-Blank)"],
-        [uniq_lm, "Unique LM Hashes (Non-Blank)"]
-    ]
+    user_pass_match_list = []
+    for user in cracked_user_info:
+        if cracked_user_info[user][5] == None:
+            pass
+        else:
+            if cracked_user_info[user][0].lower() == cracked_user_info[user][5].lower():
+                full_uname = '/'.join(filter(None, [cracked_user_info[user][1], cracked_user_info[user][0]]))
+                length = len(cracked_user_info[user][5])
+                user_pass_match_list.append([full_uname, cracked_user_info[user][5], length, cracked_user_info[user][4]])
+    user_pass_match = len(user_pass_match_list)
 
     # Get Password Length Stats
     for password in cracked:
@@ -843,18 +882,36 @@ def dpat_func(args):
             password_lengths[pw_len] = 0
         password_lengths[pw_len] += cracked[password]
 
+    stats = [
+        [num_pass_hashes, "Password Hashes", ["NTDS Username", "Password", "Password Length", "NT Hash"], num_pass_hashes_list], #, ntds_parsed],
+        [num_uniq_hash, "Unique Password Hashes"],
+        [num_cracked, "Passwords Discovered Through Cracking"],
+        [perc_total_cracked, "Percent of Passwords Cracked"],
+        [perc_uniq_cracked, "Percent of Unique Passwords Cracked"],
+        [non_blank_lm, "LM Hashes (Non-Blank)", ["NTDS Username", "LM Hash", "Shared Count"], lm_hash_list],
+        [uniq_lm, "Unique LM Hashes (Non-Blank)"],
+        [user_pass_match, "Users with Username Matching Password", ["NTDS Username", "Password", "Password Length", "NT Hash"], user_pass_match_list],
+        [percent_cracked_groups_number, "Groups Cracked by Percentage",  ["Group Name", "Percent Cracked", "Cracked Users", "Total Users"], percent_cracked_groups]
+    ]
 
     # Get Password (Complexity) Stats
     # sort from most reused to least reused dict to list of tuples
     # get the first instance of not repeated password to be min'd later
     num_repeated_passwords = 0
     cracked = sorted(cracked.items(), key=lambda x: x[1], reverse=True)
-    #print(len(cracked))
-    #print(cracked)
+
     for i in range(0, len(cracked)):
         if (cracked[i][1] == 1):
             num_repeated_passwords = i
             break
+
+    # clear the "cracked" tag
+    clear_query = "MATCH (u:User {cracked:true}) REMOVE u.cracked"
+    do_query(args,clear_query)
+
+    ###
+    ### Output methods
+    ###
 
     if args.csv:
 
@@ -969,6 +1026,7 @@ def dpat_func(args):
 
         print("[+] Writing HTML files")
 
+        # add overall stats
         for stat in stats:
 
             if len(stat) == 2:
@@ -980,9 +1038,9 @@ def dpat_func(args):
                 filename = hbt.write_html_report(filebase, ''.join([stat[1].replace(' ','_'),".html"]))
                 summary_table.append((stat[0], stat[1],"<a href=\"" + filename + "\">Details</a>"))
 
+        # add BH query results
         for item in query_output_data:
 
-            # if 'cracked' in item['label'].lower():
             cols = item['columns']
             cols.append("Status")
 
@@ -1017,24 +1075,12 @@ def dpat_func(args):
         print(" " + "="*86)
         print("|{:^10}|{:^75}|".format("Count", "Description"))
         print(" " + "="*86)
-        # print("|{:^10}|{:^75}|".format(num_pass_hashes, "Password Hashes"))
-        # print("|{:^10}|{:^75}|".format(num_uniq_hash, "Unique Password Hashes"))
-        # print("|{:^10}|{:^75}|".format(num_cracked, "Passwords Discovered Through Cracking")) # non-blank
-        # print("|{:^10}|{:^75}|".format(perc_total_cracked, "Percent of Passwords Cracked"))
-        # print("|{:^10}|{:^75}|".format(perc_uniq_cracked, "Percent of Unique Passwords Cracked"))
-        # print("|{:^10}|{:^75}|".format(non_blank_lm, "LM Hashes (Non-Blank)"))
-        # print("|{:^10}|{:^75}|".format(uniq_lm, "Unique LM Hashes (Non-Blank)"))
+
         for set in stats:
              print("|{:^10}|{:^75}|".format(set[0], set[1]))
 
         for item in query_output_data:
-            print("|{:^10}|{:^75}|".format(len(item['enabled']),item['label'] + " - Enabled"))
-            print("|{:^10}|{:^75}|".format(len(item['disabled']),item['label'] + " - Disabled"))
-
-        # print("|{:^10}|{:^51}|".format(num_das, "Members of Domain Admins"))
-        # print("|{:^10}|{:^51}|".format(query_counts["Domain Admin accounts cracked"], "Domain Admin Passwords Cracked"))
-        # print("|{:^10}|{:^51}|".format(num_das, "Members of Enterprise Admins"))
-        # print("|{:^10}|{:^51}|".format(query_counts["Enterprise Admin accounts cracked"], "Enterprise Admin Passwords Cracked"))
+            print("|{:^10}|{:^75}|".format(len(item['enabled']) + len(item['disabled']),item['label']))
 
         print(" " + "="*86)
         print("")
@@ -1053,7 +1099,8 @@ def dpat_func(args):
         print("|{:^10}|{:^75}|".format("Count", "Description"))
         print(" " + "="*86)
         for i in range(0, min(num_repeated_passwords, math.ceil( len(cracked) * 0.10 ), 50)): # cap at 50 reused passwords
-            print("|{:^10}|{:^75}|".format(cracked[i][1], sanitize(args, cracked[i][0])))
+            if cracked[i][0] != '':
+                print("|{:^10}|{:^75}|".format(cracked[i][1], sanitize(args, cracked[i][0])))
         print(" " + "="*86)
         print("")
         print("")
