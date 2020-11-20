@@ -741,12 +741,16 @@ def dpat_func(args):
             "label" : "Accounts With Paths To High Value Targets Cracked"
         },
         {
-            "query" : "MATCH (u:User {cracked:true}),p=shortestPath((u)-[r:AdminTo|MemberOf*1..6]->(n)) WHERE NOT u=n RETURN DISTINCT u.name,u.objectid,u.enabled",
+            "query" : "MATCH p1=(u1:User {cracked:true})-[r:AdminTo]->(n1),p2=(u2:User {cracked:true})-[r1:MemberOf*1..]->(g:Group)-[r2:AdminTo]->(n2) WITH COLLECT(u1)+COLLECT(u2) AS users UNWIND users AS u RETURN DISTINCT u.name,u.objectid,u.enabled",
             "label" : "Accounts With Local Admin Rights Cracked"
         },
         {
-            "query" : "MATCH (g:Group),p=shortestPath((g)-[r:AllExtendedRights|AddMember|ForceChangePassword|GenericAll|GenericWrite|Owns|WriteDacl|WriteOwner|ReadLAPSPassword|ReadGMSAPassword|CanRDP|CanPSRemote|ExecuteDCOM|AllowedToDelegate|AddAllowedToAct|AllowedToAct|SQLAdmin|HasSIDHistory]->(n)) WHERE NOT g=n WITH COLLECT(g) AS groups UNWIND groups AS g2 MATCH (u:User {cracked:true}),p2=(u)-[r:MemberOf*1..]->(g2) RETURN DISTINCT u.name,u.objectid,u.enabled",
-            "label" : "Accounts With Controlling Privileges Cracked"
+            "query" : "MATCH p1=(u:User {cracked:true})-[r:AllExtendedRights|AddMember|ForceChangePassword|GenericAll|GenericWrite|Owns|WriteDacl|WriteOwner|ReadLAPSPassword|ReadGMSAPassword|CanRDP|CanPSRemote|ExecuteDCOM|AllowedToDelegate|AddAllowedToAct|AllowedToAct|SQLAdmin|HasSIDHistory]->(n1) RETURN DISTINCT u.name,u.objectid,u.enabled",
+            "label" : "Accounts With Explicit Controlling Privileges Cracked"
+        },
+        {
+            "query" : "MATCH p2=(u:User {cracked:true})-[r1:MemberOf*1..]->(g:Group)-[r2:AllExtendedRights|AddMember|ForceChangePassword|GenericAll|GenericWrite|Owns|WriteDacl|WriteOwner|ReadLAPSPassword|ReadGMSAPassword|CanRDP|CanPSRemote|ExecuteDCOM|AllowedToDelegate|AddAllowedToAct|AllowedToAct|SQLAdmin|HasSIDHistory]->(n2) RETURN DISTINCT u.name,u.objectid,u.enabled",
+            "label" : "Accounts With Group Delegated Controlling Privileges Cracked"
         },
         {
             "query" : "MATCH (u:User {cracked:true}) WHERE u.pwdlastset < (datetime().epochseconds - (365 * 86400)) AND NOT u.pwdlastset IN [-1.0, 0.0] RETURN DISTINCT u.name,u.objectid,u.enabled",
@@ -822,7 +826,7 @@ def dpat_func(args):
 
     print("[+] Querying for Group Statistics")
     percent_cracked_groups = []
-    query = "MATCH (u:User {cracked:true}),(g:Group) MATCH (u)-[r1:MemberOf*1..]->(g) WITH COLLECT(g) AS groups UNWIND groups AS g2 MATCH (u2:User),p2=(u2)-[r2:MemberOf]->(g2),p3=(u3:User {cracked:true})-[r3:MemberOf]->(g2) RETURN g2.name, COUNT(DISTINCT(u3))*100/COUNT(DISTINCT(u2)), COUNT(DISTINCT(u3.name)), COUNT(DISTINCT(u2.name)) ORDER BY COUNT(DISTINCT(u3))*100/COUNT(DISTINCT(u2)) DESC"
+    query = "MATCH p2=(u2:User)-[r2:MemberOf]->(g2:Group),p3=(u3:User {cracked:true})-[r3:MemberOf]->(g2:Group) RETURN g2.name, COUNT(DISTINCT(u3))*100/COUNT(DISTINCT(u2)), COUNT(DISTINCT(u3.name)), COUNT(DISTINCT(u2.name)) ORDER BY COUNT(DISTINCT(u3))*100/COUNT(DISTINCT(u2)) DESC"
     r = do_query(args,query)
     resp = json.loads(r.text)['results'][0]['data']
     for entry in resp:
