@@ -13,6 +13,7 @@ import binascii
 import math
 import os
 import numpy
+import multiprocessing
 try:
     import html as htmllib
 except ImportError:
@@ -517,13 +518,44 @@ def sanitize(args, pass_or_hash):
                 "*"*(lenp-2) + pass_or_hash[lenp-1]
         return sanitized_string
 
+from itertools import (takewhile,repeat)
+
+# https://stackoverflow.com/a/27518377
+def fastcount(filename):
+    f = open(filename, 'rb')
+    bufgen = takewhile(lambda x: x, (f.raw.read(1024*1024) for _ in repeat(None)))
+    return sum( buf.count(b'\n') for buf in bufgen )
+
+def parse_ntds(lines, ntds_parsed):
+    for line in lines:
+        if ":::" not in line or '$' in line: #filters out other lines in ntds/computer obj
+            continue
+        line = line.replace("\r", "").replace("\n", "")
+        if (line == ""):
+            continue
+        else:
+            line = line.split(":")
+        # [ username, domain, rid, LM, NT, plaintext||None]
+        to_append = []
+        if (line[0].split("\\")[0] == line[0]):
+            # no domain found, local account
+            to_append.append(line[0])
+            to_append.append("")
+        else:
+            to_append.append(line[0].split("\\")[1])
+            to_append.append(line[0].split("\\")[0])
+        to_append.append(line[1])
+        to_append.append(line[2])
+        to_append.append(line[3])
+        to_append.append(None)
+        ntds_parsed.append(to_append)
 
 def dpat_func(args):
 
     cracked = {}
     cracked_user_info = {}
     lm_hashes = {}
-    nt_hashes = {}
+    nt_hashes = {}    
 
     query_counts = {}
     password_lengths = {}
@@ -545,33 +577,22 @@ def dpat_func(args):
 
     try:
         print("[+] Processing NTDS")
-        ntds_parsed = []
-        # ntds_cracked = []
-        for line in ntds:
-            if ":::" not in line or '$' in line: #filters out other lines in ntds/computer obj
-                continue
-            line = line.replace("\r", "").replace("\n", "")
-            if (line == ""):
-                continue
-            else:
-                line = line.split(":")
-            # [ username, domain, rid, LM, NT, plaintext||None]
-            to_append = []
-            if (line[0].split("\\")[0] == line[0]):
-                # no domain found, local account
-                to_append.append(line[0])
-                to_append.append("")
-            else:
-                to_append.append(line[0].split("\\")[1])
-                to_append.append(line[0].split("\\")[0])
-            to_append.append(line[1])
-            to_append.append(line[2])
-            to_append.append(line[3])
-            if (line[3] not in nt_hashes):
-                nt_hashes[line[3]] = []
-            nt_hashes[line[3]].append(line[0])
-            to_append.append(None)
-            ntds_parsed.append(to_append)
+        num_lines = fastcount(args.ntdsfile)
+        # create threads to parse file
+        procs = []
+        manager = multiprocessing.Manager()
+        ntds_parsed = manager.list()
+        num_threads = int(args.num_threads)
+        for t in range(0, num_threads):
+            start = math.ceil((num_lines / num_threads) * t)
+            end = math.ceil((num_lines / num_threads) * (t + 1))
+            p = multiprocessing.Process(target=parse_ntds, args=(ntds[ start : end ], ntds_parsed, ))
+            #print("[*] Starting thread {} with {} to {}".format(t, start, end))
+            p.start()
+            procs.append(p)
+        for p_ in procs:
+            p_.join()
+        # done parsing
 
         print("[+] Processing Potfile")
         # password stats like counting reused cracked passwords
@@ -582,6 +603,10 @@ def dpat_func(args):
                     lm_hashes[user[3]] = []
                 full_uname = '/'.join(filter(None, [user[1], user[0]]))
                 lm_hashes[user[3]].append(full_uname)
+
+            if (user[4] not in nt_hashes):
+                nt_hashes[user[4]] = []
+            nt_hashes[user[4]].append(user[0])
 
             for line in potfile:
                 line = line.replace("\r", "").replace("\n", "")
@@ -1235,6 +1260,7 @@ def main():
     dpat.add_argument("-p","--pot",dest="potfile",default="",required=True,help="Hashcat potfile")
     dpat.add_argument("-e","--password",dest="passwd",default="",required=False,help="Returns all users using the argument as a password")
     dpat.add_argument("-u","--username",dest="usern",default="",required=False,help="Returns the password for the user if cracked")
+    dpat.add_argument("-t","--threads",dest="num_threads",default=2,required=False,help="Number of threads to parse files")
     dpat.add_argument("-s","--sanitize",dest="sanitize",action="store_true",required=False,help="Sanitize the report by partially redacting passwords and hashes")
     dpat.add_argument("-o","--outputfile",dest="outputfile",default="",required=False,help="Output filename to store results, cli if none")
     dpat.add_argument("--csv",dest="csv",action="store_true",required=False,help="Store the output in a CSV format")
