@@ -91,6 +91,10 @@ def get_info(args):
             "query" : "MATCH (n:User) WHERE n.dontreqpreauth=TRUE RETURN n.name",
             "columns" : ["UserName"]
             },
+        "kerberoastableLA" : {
+            "query" : "MATCH (n:User {hasspn:true}) MATCH p=shortestPath((n)-[r:AdminTo|MemberOf*1..4]->(c:Computer)) RETURN DISTINCT n.name",
+            "columns" : ["UserName"]
+            },
         "sessions" : {
             "query" : "MATCH (m {{name:'{uname}'}})<-[r:HasSession]-(n:Computer) RETURN DISTINCT n.name",
             "columns" : ["ComputerName"]
@@ -167,6 +171,9 @@ def get_info(args):
     elif (args.nopreauth):
         query = queries["nopreauth"]["query"]
         cols = queries["nopreauth"]["columns"]
+    elif (args.kerberoastableLA):
+        query = queries["kerberoastableLA"]["query"]
+        cols = queries["kerberoastableLA"]["columns"]
     elif (args.passnotreq):
         query = queries["passnotreq"]["query"]
         cols = queries["passnotreq"]["columns"]
@@ -220,7 +227,7 @@ def get_info(args):
 
     r = do_query(args, query)
     x = json.loads(r.text)
-    #print(r.text)
+    # print(r.text)
     entry_list = x["results"][0]["data"]
 
     if args.label:
@@ -672,9 +679,14 @@ def dpat_func(args):
 
         return
     if args.usern:
+        print("[+] Searching for password for user {}".format(args.usern))
         for user in cracked_user_info:
             if (user[1] != ''):
-                if (cracked_user_info[userRecord][6] == args.usern.upper()):
+                if (cracked_user_info[user][6] == args.usern.upper()):
+                    print("{}:{}".format(cracked_user_info[user][6], sanitize(args, cracked_user_info[user][5])))
+                elif (args.usern.upper() == '/'.join(filter(None, [cracked_user_info[user][1], cracked_user_info[user][0]])).upper()):
+                    print("{}:{}".format(cracked_user_info[user][6], sanitize(args, cracked_user_info[user][5])))
+                elif (args.usern.upper() == '\\'.join(filter(None, [cracked_user_info[user][1], cracked_user_info[user][0]])).upper()):
                     print("{}:{}".format(cracked_user_info[user][6], sanitize(args, cracked_user_info[user][5])))
             else:
                 continue
@@ -753,6 +765,10 @@ def dpat_func(args):
             "label" : "Accounts With Group Delegated Controlling Privileges Cracked"
         },
         {
+            "query" : "MATCH (u:User {cracked:true}) WHERE u.lastlogon < (datetime().epochseconds - (182 * 86400)) AND NOT u.lastlogon IN [-1.0, 0.0] RETURN DISTINCT u.name,u.objectid,u.enabled",
+            "label" : "Inactive Accounts (Last Used > 6mos Ago) Cracked"
+        },
+        {
             "query" : "MATCH (u:User {cracked:true}) WHERE u.pwdlastset < (datetime().epochseconds - (365 * 86400)) AND NOT u.pwdlastset IN [-1.0, 0.0] RETURN DISTINCT u.name,u.objectid,u.enabled",
             "label" : "Accounts With Passwords Set > 1yr Ago Cracked"
         },
@@ -827,6 +843,17 @@ def dpat_func(args):
     print("[+] Querying for Group Statistics")
     percent_cracked_groups = []
     query = "MATCH p2=(u2:User)-[r2:MemberOf]->(g2:Group),p3=(u3:User {cracked:true})-[r3:MemberOf]->(g2:Group) RETURN g2.name, COUNT(DISTINCT(u3))*100/COUNT(DISTINCT(u2)), COUNT(DISTINCT(u3.name)), COUNT(DISTINCT(u2.name)) ORDER BY COUNT(DISTINCT(u3))*100/COUNT(DISTINCT(u2)) DESC"
+
+    #
+    #
+    #
+    #TODO
+    #
+    # return all users of all groups, far quicker, can potentially make individual pages for each group
+    #
+
+
+
     r = do_query(args,query)
     resp = json.loads(r.text)['results'][0]['data']
     for entry in resp:
@@ -1185,6 +1212,7 @@ def main():
     getinfo_switch.add_argument("--nolaps",dest="nolaps",default=False,action="store_true",help="Return a list of all computers without LAPS")
     getinfo_switch.add_argument("--unconst",dest="unconstrained",default=False,action="store_true",help="Return a list of all objects configured with Unconstrained Delegation")
     getinfo_switch.add_argument("--npusers",dest="nopreauth",default=False,action="store_true",help="Return a list of all users that don't require Kerberos Pre-Auth (AS-REP roastable)")
+    getinfo_switch.add_argument("--kerb-la",dest="kerberoastableLA",default=False,action="store_true",help="Return a list of Kerberoastable users that have LA in at least one place")
     getinfo_switch.add_argument("--passnotreq",dest="passnotreq",default=False,action="store_true",help="Return a list of all users that have PasswordNotRequired flag set to true")
     getinfo_switch.add_argument("--sidhist",dest="sidhist",default=False,action="store_true",help="Return a list of objects configured with SID History")
     getinfo_switch.add_argument("--unsupported",dest="unsupos",default=False,action="store_true",help="Return a list of computers running an unsupported OS")
