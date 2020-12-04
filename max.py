@@ -599,6 +599,8 @@ def dpat_func(args):
             procs.append(p)
         for p_ in procs:
             p_.join()
+        # destroy managed list
+        ntds_parsed = list(ntds_parsed)
         # done parsing
 
         print("[+] Processing Potfile")
