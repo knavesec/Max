@@ -18,6 +18,8 @@ try:
     import html as htmllib
 except ImportError:
     import cgi as htmllib
+from itertools import takewhile, repeat
+
 
 # option to hardcode URL & URI
 global_url = "http://127.0.0.1:7474"
@@ -59,79 +61,83 @@ def get_info(args):
         "users" : {
             "query" : "MATCH (u:User) {enabled} RETURN u.name",
             "columns" : ["UserName"]
-            },
+        },
         "comps" : {
             "query" : "MATCH (n:Computer) RETURN n.name",
             "columns" : ["ComputerName"]
-            },
+        },
         "groups" : {
             "query" : "MATCH (n:Group) RETURN n.name",
             "columns" : ["GroupName"]
-            },
+        },
         "group-members" : {
             "query" : "MATCH (g:Group {{name:\"{gname}\"}}) MATCH (n)-[r:MemberOf*1..]->(g) RETURN DISTINCT n.name",
             "columns" : ["ObjectName"]
-            },
+        },
         "groups-full" : {
             "query" : "MATCH (n),(g:Group) MATCH (n)-[r:MemberOf]->(g) RETURN DISTINCT g.name,n.name",
             "columns" : ["GroupName","MemberName"]
-            },
+        },
         "das" : {
             "query" : "MATCH p=(n:User)-[r:MemberOf*1..]->(g:Group) WHERE g.objectid ENDS WITH '-512' RETURN DISTINCT n.name",
             "columns" : ["UserName"]
-            },
+        },
         "dasess" : {
             "query" : "MATCH (u:User)-[r:MemberOf*1..]->(g:Group) WHERE g.objectid ENDS WITH '-512' WITH COLLECT(u) AS das MATCH (u2:User)<-[r2:HasSession]-(c:Computer) WHERE u2 IN das RETURN DISTINCT u2.name,c.name ORDER BY u2.name",
             "columns" : ["UserName","ComputerName"]
-            },
+        },
         "unconstrained" : {
             "query" : "MATCH (n) WHERE n.unconstraineddelegation=TRUE RETURN n.name",
             "columns" : ["ObjectName"]
-            },
+        },
         "nopreauth" : {
             "query" : "MATCH (n:User) WHERE n.dontreqpreauth=TRUE RETURN n.name",
             "columns" : ["UserName"]
-            },
+        },
+        "kerberoastable" : {
+            "query" : "MATCH (n:User {hasspn:true}) RETURN n.name",
+            "columns" : ["UserName"]
+        },
         "kerberoastableLA" : {
             "query" : "MATCH (n:User {hasspn:true}) MATCH p=shortestPath((n)-[r:AdminTo|MemberOf*1..4]->(c:Computer)) RETURN DISTINCT n.name",
             "columns" : ["UserName"]
-            },
+        },
         "sessions" : {
             "query" : "MATCH (m {{name:'{uname}'}})<-[r:HasSession]-(n:Computer) RETURN DISTINCT n.name",
             "columns" : ["ComputerName"]
-            },
+        },
         "localadmin" : {
             "query" : "MATCH (m {{name:'{uname}'}})-[r:AdminTo|MemberOf*1..4]->(n:Computer) RETURN DISTINCT n.name",
             "columns" : ["ComputerName"]
-            },
+        },
         "adminsof" : {
             "query" : "MATCH p=shortestPath((m:Computer {{name:'{comp}'}})<-[r:AdminTo|MemberOf*1..]-(n)) RETURN DISTINCT n.name",
             "columns" : ["UserName"]
-            },
+        },
         "owned" : {
             "query" : "MATCH (n) WHERE n.owned=true RETURN n.name",
             "columns" : ["ObjectName"]
-            },
+        },
         "owned-groups" : {
             "query" : "MATCH (n {owned:true}) MATCH (n)-[r:MemberOf*1..]->(g:Group) RETURN DISTINCT n.name,g.name",
             "columns" : ["ObjectName","GroupName"]
-            },
+        },
         "hvt" : {
             "query" : "MATCH (n) WHERE n.highvalue=true RETURN n.name",
             "columns" : ["ObjectName"]
-            },
+        },
         "desc" : {
             "query" : "MATCH (n) WHERE n.description IS NOT NULL RETURN n.name,n.description",
             "columns" : ["ObjectName","Description"]
-            },
+        },
         "admincomps" : {
             "query" : "MATCH (n:Computer),(m:Computer) MATCH (n)-[r:MemberOf|AdminTo*1..]->(m) RETURN DISTINCT n.name,m.name ORDER BY n.name",
-            "columns" : ["AdminComputerName","CompterName"]
-            },
+            "columns" : ["AdminComputerName","VictimCompterName"]
+        },
         "nolaps" : {
             "query" : "MATCH (c:Computer {haslaps:false}) RETURN c.name",
             "columns" : ["ComputerName"]
-            },
+        },
         "passnotreq" : {
             "query" : "MATCH (u:User {{passwordnotreqd:true}}) {enabled} RETURN u.name",
             "columns" : ["UserName"]
@@ -143,6 +149,10 @@ def get_info(args):
         "unsupos" : {
             "query" : "MATCH (c:Computer) WHERE c.operatingsystem =~ '.*(2000|2003|2008|xp|vista| 7 |me).*' RETURN c.name,c.operatingsystem",
             "columns" : ["ComputerName","OperatingSystem"]
+        },
+        "foreignprivs" : {
+            "query" : "MATCH p=(n1)-[r]->(n2) WHERE NOT n1.domain=n2.domain RETURN DISTINCT n1.name,TYPE(r),n2.name ORDER BY TYPE(r)",
+            "columns" : ["NodeName","EdgeName","VictimNodeName"]
         }
     }
 
@@ -172,6 +182,9 @@ def get_info(args):
     elif (args.nopreauth):
         query = queries["nopreauth"]["query"]
         cols = queries["nopreauth"]["columns"]
+    elif (args.kerberoastable):
+        query = queries["kerberoastableLA"]["query"]
+        cols = queries["kerberoastableLA"]["columns"]
     elif (args.kerberoastableLA):
         query = queries["kerberoastableLA"]["query"]
         cols = queries["kerberoastableLA"]["columns"]
@@ -202,6 +215,9 @@ def get_info(args):
     elif (args.nolaps):
         query = queries["nolaps"]["query"]
         cols = queries["nolaps"]["columns"]
+    elif (args.foreignprivs):
+        query = queries["foreignprivs"]["query"]
+        cols = queries["foreignprivs"]["columns"]
     elif (args.unamesess != ""):
         query = queries["sessions"]["query"].format(uname=args.unamesess.upper().strip())
         cols = queries["sessions"]["columns"]
@@ -510,216 +526,210 @@ def add_spw(args):
 
     print("[+] SharesPasswordWith relationships created: " + str(count))
 
-# code from https://github.com/clr2of8/DPAT/blob/master/dpat.py#L64
-def sanitize(args, pass_or_hash):
-    if not args.sanitize:
-        return pass_or_hash
-    else:
-        sanitized_string = pass_or_hash
-        lenp = len(pass_or_hash)
-        if lenp == 32:
-            sanitized_string = pass_or_hash[0:4] + \
-                "*"*(lenp-8) + pass_or_hash[lenp-5:lenp-1]
-        elif lenp > 2:
-            sanitized_string = pass_or_hash[0] + \
-                "*"*(lenp-2) + pass_or_hash[lenp-1]
-        return sanitized_string
-
-from itertools import (takewhile,repeat)
-
-# https://stackoverflow.com/a/27518377
-def fastcount(filename):
-    f = open(filename, 'rb')
-    bufgen = takewhile(lambda x: x, (f.raw.read(1024*1024) for _ in repeat(None)))
-    return sum( buf.count(b'\n') for buf in bufgen )
-
-def parse_ntds(lines, ntds_parsed):
-    for line in lines:
-        if ":::" not in line or '$' in line: #filters out other lines in ntds/computer obj
-            continue
-        line = line.replace("\r", "").replace("\n", "")
-        if (line == ""):
-            continue
-        else:
-            line = line.split(":")
-        # [ username, domain, rid, LM, NT, plaintext||None]
-        to_append = []
-        if (line[0].split("\\")[0] == line[0]):
-            # no domain found, local account
-            to_append.append(line[0])
-            to_append.append("")
-        else:
-            to_append.append(line[0].split("\\")[1])
-            to_append.append(line[0].split("\\")[0])
-        to_append.append(line[1])
-        to_append.append(line[2])
-        to_append.append(line[3])
-        to_append.append(None)
-        ntds_parsed.append(to_append)
 
 def dpat_func(args):
 
-    cracked = {}
-    cracked_user_info = {}
-    lm_hashes = {}
-    nt_hashes = {}    
+    # code from https://github.com/clr2of8/DPAT/blob/master/dpat.py#L64
+    def sanitize(args, pass_or_hash):
+        if not args.sanitize:
+            return pass_or_hash
+        else:
+            sanitized_string = pass_or_hash
+            lenp = len(pass_or_hash)
+            if lenp == 32:
+                sanitized_string = pass_or_hash[0:4] + \
+                    "*"*(lenp-8) + pass_or_hash[lenp-5:lenp-1]
+            elif lenp > 2:
+                sanitized_string = pass_or_hash[0] + \
+                    "*"*(lenp-2) + pass_or_hash[lenp-1]
+            return sanitized_string
+
+    def parse_ntds(lines, ntds_parsed):
+        for line in lines:
+            if ":::" not in line or '$' in line: #filters out other lines in ntds/computer obj
+                continue
+            line = line.replace("\r", "").replace("\n", "")
+            if (line == ""):
+                continue
+            else:
+                line = line.split(":")
+            # [ username, domain, rid, LM, NT, plaintext||None]
+            to_append = []
+            if (line[0].split("\\")[0] == line[0]):
+                # no domain found, local account
+                to_append.append(line[0])
+                to_append.append("")
+            else:
+                to_append.append(line[0].split("\\")[1])
+                to_append.append(line[0].split("\\")[0])
+            to_append.append(line[1])
+            to_append.append(line[2])
+            to_append.append(line[3])
+            ntds_parsed.append(to_append)
+
+    def map_users(users):
+        for user in users:
+            try:
+                nt_hash = user[4]
+                lm_hash = user[3]
+                ntds_uname = '/'.join(filter(None, [user[1], user[0]])).replace("\\","\\\\").replace("'","\\'")
+                username = str(user[0].upper().strip() + "@" + user[1].upper().strip()).replace("\\","\\\\").replace("'","\\'")
+                cracked_bool = 'false'
+                password = None
+                password_query = ''
+                if nt_hash in potfile:
+                    cracked_bool = 'true'
+                    password = potfile[nt_hash]
+                elif lm_hash != "aad3b435b51404eeaad3b435b51404ee" and lm_hash in potfile:
+                    cracked_bool = 'true'
+                    password = potfile[lm_hash]
+
+                if password != None:
+                    if "$HEX[" in password:
+                        print("[!] found $HEX[], stripping and unpacking")
+                        password = binascii.unhexlify( str( password.split("[")[1].replace("]", "") ) ).decode("utf-8")
+                    password = password.replace("\\","\\\\").replace("'","\\'")
+                    password_query = "SET u.password='{pwd}'".format(pwd=password)
+
+                cracked_query = "SET u.cracked={cracked_bool} SET u.nt_hash='{nt_hash}' SET u.lm_hash='{lm_hash}' SET u.ntds_uname='{ntds_uname}' {password}".format(cracked_bool=cracked_bool,nt_hash=nt_hash,lm_hash=lm_hash,ntds_uname=ntds_uname,password=password_query)
+                query1 = "MATCH (u:User) WHERE u.name='{username}' {cracked_query} RETURN u.name,u.objectid".format(username=username, cracked_query=cracked_query)
+                # print(query1)
+                r1 = do_query(args,query1)
+                bh_users = json.loads(r1.text)['results'][0]['data']
+                if bh_users == []:
+                    # try matching based off username and rid
+                    query2 = "MATCH (u:User) WHERE u.name STARTS WITH '{username}@' AND u.objectid ENDS WITH '-{rid}' {cracked_query} RETURN u.name,u.objectid".format(username=user[0].replace("\\","\\\\").replace("'","\\'").upper(), rid=user[2].upper(), cracked_query=cracked_query)
+                    r2 = do_query(args,query2)
+                    bh_users = json.loads(r2.text)['results'][0]['data']
+
+                # if bh_users == [] then the user was not found in BH
+
+            except Exception as g:
+                print('{}'.format(g))
+                print(query1)
+                pass
+
 
     query_counts = {}
-    password_lengths = {}
 
-    if (args.ntdsfile != None):
-        ntds = open(args.ntdsfile, 'r').readlines()
-    else:
-        print("[-] Error, Need NTDS file")
-        return
-    if (args.potfile != None):
-        potfile = open(args.potfile, 'r').readlines()
-    else:
-        print("[-] Error, Need potfile")
+    if args.clear:
+        print("[+] Clearing attributes from all users: cracked, password, nt_hash, lm_hash, ntds_uname")
+        clear_query = "MATCH (u:User) REMOVE u.cracked REMOVE u.nt_hash REMOVE u.lm_hash REMOVE u.ntds_uname REMOVE u.password"
+        do_query(args,clear_query)
         return
 
     if ((args.outputfile) and (not args.csv and not args.html)):
         print("[-] Error, --outputfile requires --csv and/or --html type output flags")
         return
 
-    try:
-        print("[+] Processing NTDS")
-        num_lines = fastcount(args.ntdsfile)
-        # create threads to parse file
-        procs = []
-        manager = multiprocessing.Manager()
-        ntds_parsed = manager.list()
-        num_threads = int(args.num_threads)
-        for t in range(0, num_threads):
-            start = math.ceil((num_lines / num_threads) * t)
-            end = math.ceil((num_lines / num_threads) * (t + 1))
-            p = multiprocessing.Process(target=parse_ntds, args=(ntds[ start : end ], ntds_parsed, ))
-            #print("[*] Starting thread {} with {} to {}".format(t, start, end))
-            p.start()
-            procs.append(p)
-        for p_ in procs:
-            p_.join()
-        # destroy managed list
-        ntds_parsed = list(ntds_parsed)
-        # done parsing
+    if not args.noparse:
 
-        print("[+] Processing Potfile")
-        # password stats like counting reused cracked passwords
-        for user in ntds_parsed:
-            # LM found
-            if (user[3] != "aad3b435b51404eeaad3b435b51404ee"):
-                if (user[3] not in lm_hashes):
-                    lm_hashes[user[3]] = []
-                full_uname = '/'.join(filter(None, [user[1], user[0]]))
-                lm_hashes[user[3]].append(full_uname)
-
-            if (user[4] not in nt_hashes):
-                nt_hashes[user[4]] = []
-            nt_hashes[user[4]].append(user[0])
-
-            for line in potfile:
-                line = line.replace("\r", "").replace("\n", "")
-                if (line == ""):
-                    continue
-                line = line.replace("$NT$", "").replace("$LM$", "").split(":")
-
-                # match NT hash
-                if (line[0] == user[4]):
-                    # found in potfile, cracked
-                    if ("$HEX[" in line[1]):
-                        print("[!] found $HEX[], stripping and unpacking")
-                        user[5] = binascii.unhexlify( str( line[1].split("[")[1].replace("]", "") ) ).decode("utf-8")
-                    else:
-                        if (user[4] == "31d6cfe0d16ae931b73c59d7e0c089c0"):
-                            user[5] = ""
-                        else:
-                            user[5] = line[1]
-                    if (user[5] not in cracked):
-                        cracked[user[5]] = 0
-                    cracked[user[5]] += 1
-
-        try:
-            print('[+] Mapping NTDS users to BloodHound data')
-            for i in range(0,len(ntds_parsed)):
-                # [ username, domain, rid, LM, NT, plaintext||None, bh username, sid]
-                # try query1 to see if we can resolve the users based off solely username+domain
-                try:
-                    user = ntds_parsed[i]
-                    crack_query = ""
-                    if user[5] is not None:
-                        crack_query = 'SET u.cracked=true'
-                    query1 = "MATCH (u:User) WHERE u.name='{username}' {crack_query} RETURN u.name,u.objectid".format(username=str(user[0].upper().strip() + "@" + user[1].upper().strip()), crack_query=crack_query)
-                    r = do_query(args,query1)
-                    bh_users = json.loads(r.text)['results'][0]['data']
-                    if bh_users == []:
-                        # try matching based off username and rid
-                        query2 = "MATCH (u:User) WHERE u.name STARTS WITH '{username}@' AND u.objectid ENDS WITH '-{rid}' {crack_query} RETURN u.name,u.objectid".format(username=user[0].upper(), rid=user[2].upper(), crack_query=crack_query)
-                        r = do_query(args,query2)
-                        bh_users = json.loads(r.text)['results'][0]['data']
-
-                    bh_username = bh_users[0]['row'][0]
-                    bh_sid = bh_users[0]['row'][1]
-
-                    ntds_parsed[i].append(bh_username)
-
-                    cracked_user_info[bh_sid] = ntds_parsed[i]
-
-                except Exception as g:
-                    # user doesn't have an entry in AD, disregard and cleanup stats
-                    # current_lm = ntds_parsed[i][3]
-                    # if (current_lm == "aad3b435b51404eeaad3b435b51404ee"):
-                    #     pass
-                    # elif (lm_hashes[current_lm] != 1):
-                    #     lm_hashes[current_lm] -= 1
-                    # else:
-                    #     lm_hashes.pop(current_lm, None)
-                    # curent_nt = ntds_parsed[i][4]
-                    # if (nt_hashes[curent_nt] != 1):
-                    #     nt_hashes[curent_nt] -= 1
-                    # else:
-                    #     nt_hashes.pop(curent_nt, None)
-                    pass
-
-
-        except Exception as f:
-            print("[-] Error: {}".format(f))
+        if args.ntdsfile != None:
+            ntds = open(args.ntdsfile, 'r').readlines()
+        else:
+            print("[-] Error, Need NTDS file")
+            return
+        if args.potfile == None:
+            print("[-] Error, Need potfile")
             return
 
-        print("[+] BloodHound data queried successfully, {} NTDS users mapped to BH data".format(len(ntds_parsed)))
+        try:
+            print("[+] Processing NTDS")
+            num_lines = len(ntds)
+            # create threads to parse file
+            procs = []
+            manager = multiprocessing.Manager()
+            ntds_parsed = manager.list()
+            num_threads = int(args.num_threads)
+            for t in range(0, num_threads):
+                start = math.ceil((num_lines / num_threads) * t)
+                end = math.ceil((num_lines / num_threads) * (t + 1))
+                p = multiprocessing.Process(target=parse_ntds, args=(ntds[ start : end ], ntds_parsed, ))
+                #print("[*] Starting thread {} with {} to {}".format(t, start, end))
+                p.start()
+                procs.append(p)
+            for p_ in procs:
+                p_.join()
+            # destroy managed list
+            """
+            ntds_parsed = {
+              [uname, domain, rid, lm hash, nt hash, password] ....
+            }
+            """
+            ntds_parsed = list(ntds_parsed)
+            # done parsing
 
-    except Exception as e:
-        print("[-] Error, {}".format(e))
-        return
+
+            print("[+] Processing Potfile")
+            # password stats like counting reused cracked passwords
+
+            potfile = {}
+            with open(args.potfile,'r') as pot:
+                for line in pot.readlines():
+                    try:
+                        line = line.strip().replace("$NT$", "").replace("$LM$", "")
+                        if (line == ""):
+                            continue
+                        line = line.split(":")
+
+                        if len(line[0]) != 32:
+                            continue
+
+                        potfile[line[0]] = line[1]
+
+                    except:
+                        pass
+
+            print('[+] Mapping NTDS users to BloodHound data')
+
+            num_lines = len(ntds_parsed)
+            # create threads to parse file
+            procs = []
+            num_threads = int(args.num_threads)
+            for t in range(0, num_threads):
+                start = math.ceil((num_lines / num_threads) * t)
+                end = math.ceil((num_lines / num_threads) * (t + 1))
+                p = multiprocessing.Process(target=map_users, args=(ntds_parsed[ start : end ], ))
+                #print("[*] Starting thread {} with {} to {}".format(t, start, end))
+                p.start()
+                procs.append(p)
+            for p_ in procs:
+                p_.join()
+
+
+            print("[+] BloodHound data queried successfully, {} NTDS users mapped to BH data".format(len(ntds_parsed)))
+
+        except Exception as e:
+            print("[-] Error, {}".format(e))
+            return
 
     ###
     ### Searching for specific user/password
     ###
+    # TODO: do this stuff pre-processing for the love
+    # TODO: Output other info like hashes, full names, etc
 
     if args.passwd:
         print("[+] Searching for users with password {}".format(args.passwd))
-        for user in cracked_user_info:
-            if (cracked_user_info[user][5] == args.passwd):
-                if (cracked_user_info[user][1] != ''):
-                    print("{}".format(cracked_user_info[user][6]))
-                else:
-                    print("{}".format(cracked_user_info[user][0]))
-
+        query = "MATCH (u:User {{cracked:true}}) WHERE u.password='{pwd}' RETURN u.name".format(pwd=args.passwd.replace("\\","\\\\").replace("'","\\'"))
+        r = do_query(args,query)
+        resp = json.loads(r.text)['results'][0]['data']
+        print("[+] Users: {}\n".format(len(resp)))
+        for entry in resp:
+            print(entry['row'][0])
         return
+
     if args.usern:
         print("[+] Searching for password for user {}".format(args.usern))
-        for user in cracked_user_info:
-            if (user[1] != ''):
-                if (cracked_user_info[user][6] == args.usern.upper()):
-                    print("{}:{}".format(cracked_user_info[user][6], sanitize(args, cracked_user_info[user][5])))
-                elif (args.usern.upper() == '/'.join(filter(None, [cracked_user_info[user][1], cracked_user_info[user][0]])).upper()):
-                    print("{}:{}".format(cracked_user_info[user][6], sanitize(args, cracked_user_info[user][5])))
-                elif (args.usern.upper() == '\\'.join(filter(None, [cracked_user_info[user][1], cracked_user_info[user][0]])).upper()):
-                    print("{}:{}".format(cracked_user_info[user][6], sanitize(args, cracked_user_info[user][5])))
-            else:
-                continue
-                #if (user[0].upper() == args.usern.split("@")[0]):
-                #    print(sanitize(args, user[5]))
-
+        query = "MATCH (u:User) WHERE u.name='{uname}' OR toUpper(u.ntds_uname)='{uname}' RETURN u.name,u.password".format(uname=args.usern.upper().replace("\\","\\\\").replace("'","\\'"))
+        r = do_query(args,query)
+        resp = json.loads(r.text)['results'][0]['data']
+        if resp == []:
+            print("[-] User {uname} not found".format(uname=args.usern))
+        elif resp[0]['row'][1] == None:
+            print("[-] User {uname} not cracked, no password found".format(uname=args.usern))
+        else:
+            print("[+] Password for user {uname}: {pwd}".format(uname=args.usern,pwd=sanitize(args, resp[0]['row'][1])))
         return
 
     ###
@@ -728,80 +738,81 @@ def dpat_func(args):
 
     queries = [
         {
-            'query' : "MATCH (u:User) RETURN DISTINCT u.name,u.objectid,u.enabled",
+            'query' : "MATCH (u:User) RETURN DISTINCT u.enabled,u.ntds_uname,u.nt_hash,u.password",
             'label' : "All User Accounts"
         },
         {
-            'query' : "MATCH (u:User {cracked:true}) RETURN DISTINCT u.name,u.objectid,u.enabled",
+            'query' : "MATCH (u:User {cracked:true}) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
             'label' : "All User Accounts Cracked"
         },
         {
-            'query' : "MATCH (g:Group) WHERE g.objectid ENDS WITH '-512' MATCH (u:User)-[r:MemberOf*1..]->(g) RETURN DISTINCT u.name,u.objectid,u.enabled",
+            'query' : "MATCH (g:Group) WHERE g.objectid ENDS WITH '-512' MATCH (u:User)-[r:MemberOf*1..]->(g) RETURN DISTINCT u.enabled,u.ntds_uname,u.nt_hash,u.password",
             'label' : "Domain Admin Members"
         },
         {
-            'query' : "MATCH (g:Group) WHERE g.objectid ENDS WITH '-512' MATCH (u:User {cracked:true})-[r:MemberOf*1..]->(g) RETURN DISTINCT u.name,u.objectid,u.enabled",
+            'query' : "MATCH (g:Group) WHERE g.objectid ENDS WITH '-512' MATCH (u:User {cracked:true})-[r:MemberOf*1..]->(g) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
             'label' : "Domain Admin Members Cracked"
         },
         {
-            'query' : "MATCH (g:Group) WHERE g.objectid ENDS WITH '-519' MATCH (u:User)-[r:MemberOf*1..]->(g) RETURN DISTINCT u.name,u.objectid,u.enabled",
+            'query' : "MATCH (g:Group) WHERE g.objectid ENDS WITH '-519' MATCH (u:User)-[r:MemberOf*1..]->(g) RETURN DISTINCT u.enabled,u.ntds_uname,u.nt_hash,u.password",
             'label' : "Enterprise Admin Members"
         },
         {
-            'query' : "MATCH (g:Group) WHERE g.objectid ENDS WITH '-519' MATCH (u:User {cracked:true})-[r:MemberOf*1..]->(g) RETURN DISTINCT u.name,u.objectid,u.enabled",
+            'query' : "MATCH (g:Group) WHERE g.objectid ENDS WITH '-519' MATCH (u:User {cracked:true})-[r:MemberOf*1..]->(g) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
             'label' : "Enterprise Admin Accounts Cracked"
         },
         {
-            'query' : "MATCH (g:Group) WHERE g.objectid ENDS WITH '-544' MATCH (u:User)-[r:MemberOf]->(g) RETURN DISTINCT u.name,u.objectid,u.enabled",
+            'query' : "MATCH (g:Group) WHERE g.objectid ENDS WITH '-544' MATCH (u:User)-[r:MemberOf]->(g) RETURN DISTINCT u.enabled,u.ntds_uname,u.nt_hash,u.password",
             'label' : "Administrator Group Members"
         },
         {
-            'query' : "MATCH (g:Group) WHERE g.objectid ENDS WITH '-544' MATCH (u:User {cracked:true})-[r:MemberOf]->(g) RETURN DISTINCT u.name,u.objectid,u.enabled",
+            'query' : "MATCH (g:Group) WHERE g.objectid ENDS WITH '-544' MATCH (u:User {cracked:true})-[r:MemberOf]->(g) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
             'label' : "Administrator Group Member Accounts Cracked"
         },
         {
-            'query' : "MATCH (u:User {cracked:true,hasspn:true}) RETURN DISTINCT u.name,u.objectid,u.enabled",
+            'query' : "MATCH (u:User {cracked:true,hasspn:true}) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
             'label' : "Kerberoastable Users Cracked"
         },
         {
-            'query' : "MATCH (u:User {cracked:true,dontreqpreauth:true}) RETURN DISTINCT u.name,u.objectid,u.enabled",
+            'query' : "MATCH (u:User {cracked:true,dontreqpreauth:true}) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
             'label' : "Accounts Not Requiring Kerberos Pre-Authentication Cracked"
         },
         {
-            'query' : "MATCH (u:User {cracked:true,unconstraineddelegation:true}) RETURN DISTINCT u.name,u.objectid,u.enabled",
+            'query' : "MATCH (u:User {cracked:true,unconstraineddelegation:true}) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
             'label' : "Unconstrained Delegation Accounts Cracked"
         },
         {
-            "query" : "MATCH (u:User {cracked:true}),(n {unconstraineddelegation:true}),p=shortestPath((u)-[r*1..]->(n)) WHERE NONE (r IN relationships(p) WHERE type(r)= 'GetChanges') AND NONE (r in relationships(p) WHERE type(r)='GetChangesAll') AND NOT u=n RETURN DISTINCT u.name,u.objectid,u.enabled",
+            "query" : "MATCH (u:User {cracked:true}) WHERE u.lastlogon < (datetime().epochseconds - (182 * 86400)) AND NOT u.lastlogon IN [-1.0, 0.0] RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
+            "label" : "Inactive Accounts (Last Used Over 6mos Ago) Cracked"
+        },
+        {
+            "query" : "MATCH (u:User {cracked:true}) WHERE u.pwdlastset < (datetime().epochseconds - (365 * 86400)) AND NOT u.pwdlastset IN [-1.0, 0.0] RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
+            "label" : "Accounts With Passwords Set Over 1yr Ago Cracked"
+        },
+        {
+            "query" : "MATCH (u:User {cracked:true,pwdneverexpires:true}) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
+            "label" : "Accounts With Passwords That Never Expire Cracked"
+        },
+
+        {
+            "query" : "MATCH (u:User {cracked:true}),(n {unconstraineddelegation:true}),p=shortestPath((u)-[r*1..]->(n)) WHERE NONE (r IN relationships(p) WHERE type(r)= 'GetChanges') AND NONE (r in relationships(p) WHERE type(r)='GetChangesAll') AND NOT u=n RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
             "label" : "Accounts With Paths To Unconstrained Delegation Objects Cracked"
         },
         {
-            "query" : "MATCH (u:User {cracked:true}),(n {highvalue:true}),p=shortestPath((u)-[r*1..]->(n)) WHERE NONE (r IN relationships(p) WHERE type(r)= 'GetChanges') AND NONE (r in relationships(p) WHERE type(r)='GetChangesAll') AND NOT u=n RETURN DISTINCT u.name,u.objectid,u.enabled",
+            "query" : "MATCH (u:User {cracked:true}),(n {highvalue:true}),p=shortestPath((u)-[r*1..]->(n)) WHERE NONE (r IN relationships(p) WHERE type(r)= 'GetChanges') AND NONE (r in relationships(p) WHERE type(r)='GetChangesAll') AND NOT u=n RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
             "label" : "Accounts With Paths To High Value Targets Cracked"
         },
         {
-            "query" : "MATCH p1=(u1:User {cracked:true})-[r:AdminTo]->(n1),p2=(u2:User {cracked:true})-[r1:MemberOf*1..]->(g:Group)-[r2:AdminTo]->(n2) WITH COLLECT(u1)+COLLECT(u2) AS users UNWIND users AS u RETURN DISTINCT u.name,u.objectid,u.enabled",
+            "query" : "MATCH p1=(u1:User {cracked:true})-[r:AdminTo]->(n1),p2=(u2:User {cracked:true})-[r1:MemberOf*1..]->(g:Group)-[r2:AdminTo]->(n2) WITH COLLECT(u1)+COLLECT(u2) AS users UNWIND users AS u RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
             "label" : "Accounts With Local Admin Rights Cracked"
         },
         {
-            "query" : "MATCH p1=(u:User {cracked:true})-[r:AllExtendedRights|AddMember|ForceChangePassword|GenericAll|GenericWrite|Owns|WriteDacl|WriteOwner|ReadLAPSPassword|ReadGMSAPassword|CanRDP|CanPSRemote|ExecuteDCOM|AllowedToDelegate|AddAllowedToAct|AllowedToAct|SQLAdmin|HasSIDHistory]->(n1) RETURN DISTINCT u.name,u.objectid,u.enabled",
+            "query" : "MATCH p1=(u:User {cracked:true})-[r:AllExtendedRights|AddMember|ForceChangePassword|GenericAll|GenericWrite|Owns|WriteDacl|WriteOwner|ReadLAPSPassword|ReadGMSAPassword|CanRDP|CanPSRemote|ExecuteDCOM|AllowedToDelegate|AddAllowedToAct|AllowedToAct|SQLAdmin|HasSIDHistory]->(n1) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
             "label" : "Accounts With Explicit Controlling Privileges Cracked"
         },
         {
-            "query" : "MATCH p2=(u:User {cracked:true})-[r1:MemberOf*1..]->(g:Group)-[r2:AllExtendedRights|AddMember|ForceChangePassword|GenericAll|GenericWrite|Owns|WriteDacl|WriteOwner|ReadLAPSPassword|ReadGMSAPassword|CanRDP|CanPSRemote|ExecuteDCOM|AllowedToDelegate|AddAllowedToAct|AllowedToAct|SQLAdmin|HasSIDHistory]->(n2) RETURN DISTINCT u.name,u.objectid,u.enabled",
+            "query" : "MATCH p2=(u:User {cracked:true})-[r1:MemberOf*1..]->(g:Group)-[r2:AllExtendedRights|AddMember|ForceChangePassword|GenericAll|GenericWrite|Owns|WriteDacl|WriteOwner|ReadLAPSPassword|ReadGMSAPassword|CanRDP|CanPSRemote|ExecuteDCOM|AllowedToDelegate|AddAllowedToAct|AllowedToAct|SQLAdmin|HasSIDHistory]->(n2) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
             "label" : "Accounts With Group Delegated Controlling Privileges Cracked"
-        },
-        {
-            "query" : "MATCH (u:User {cracked:true}) WHERE u.lastlogon < (datetime().epochseconds - (182 * 86400)) AND NOT u.lastlogon IN [-1.0, 0.0] RETURN DISTINCT u.name,u.objectid,u.enabled",
-            "label" : "Inactive Accounts (Last Used > 6mos Ago) Cracked"
-        },
-        {
-            "query" : "MATCH (u:User {cracked:true}) WHERE u.pwdlastset < (datetime().epochseconds - (365 * 86400)) AND NOT u.pwdlastset IN [-1.0, 0.0] RETURN DISTINCT u.name,u.objectid,u.enabled",
-            "label" : "Accounts With Passwords Set > 1yr Ago Cracked"
-        },
-        {
-            "query" : "MATCH (u:User {cracked:true,pwdneverexpires:true}) RETURN DISTINCT u.name,u.objectid,u.enabled",
-            "label" : "Accounts With Passwords That Never Expire Cracked"
         }
     ]
 
@@ -815,6 +826,17 @@ def dpat_func(args):
     ]
     """
     query_output_data = []
+
+    hashes = {}
+    query = "MATCH (u:User) WHERE EXISTS(u.nt_hash) RETURN u.nt_hash,u.ntds_uname"
+    r = do_query(args,query)
+    resp = json.loads(r.text)['results'][0]['data']
+
+    for entry in resp:
+        if entry['row'][0] not in hashes:
+            hashes[entry['row'][0]] = [entry['row'][1]]
+        else:
+            hashes[entry['row'][0]].append(entry['row'][1])
 
     for search_value in queries:
 
@@ -830,81 +852,104 @@ def dpat_func(args):
         r = do_query(args,query)
         resp = json.loads(r.text)['results'][0]['data']
         for entry in resp:
-            query_counts[label] += 1 #TODO
+            query_counts[label] += 1 # TODO
             status_flag = "disabled"
-            if entry['row'][2]:
+            if entry['row'][0]:
                 status_flag = "enabled"
 
             if "cracked" in label.lower():
                 try:
-                    length = ''
-                    if cracked_user_info[entry['row'][1]][5] != None:
-                        length = len(cracked_user_info[entry['row'][1]][5])
-                    full_uname = '/'.join(filter(None, [cracked_user_info[entry['row'][1]][1], cracked_user_info[entry['row'][1]][0]]))
-                    dat[status_flag].append([full_uname, cracked_user_info[entry['row'][1]][5], length, cracked_user_info[entry['row'][1]][4]])
-                #     else:
-                #         dat['disabled'].append(cracked_user_info[entry['row'][1]])
+                    user = [entry['row'][1], entry['row'][2], len(entry['row'][2]), entry['row'][3]]
+                    dat[status_flag].append(user)
                 except:
                     pass
             else:
                 try:
-                    full_uname = '/'.join(filter(None, [cracked_user_info[entry['row'][1]][1], cracked_user_info[entry['row'][1]][0]]))
-                    all_hashes_shared = ', '.join(nt_hashes[cracked_user_info[entry['row'][1]][4]])
-                    if len(nt_hashes[cracked_user_info[entry['row'][1]][4]]) > 30:
+                    share_count = len(hashes[entry['row'][2]])
+                    if share_count > 30:
                         all_hashes_shared = "Shared Hash List > 30"
-                    dat[status_flag].append( [full_uname, cracked_user_info[entry['row'][1]][4], all_hashes_shared, len(nt_hashes[cracked_user_info[entry['row'][1]][4]]), cracked_user_info[entry['row'][1]][5] ])
+                    else:
+                        all_hashes_shared = ', '.join(hashes[entry['row'][2]])
+                    user = [entry['row'][1], entry['row'][2], all_hashes_shared, share_count, entry['row'][3]]
+                    dat[status_flag].append(user)
                 except:
                     pass
 
         if "cracked" in label.lower():
             dat['columns'] = ["Username", "Password", "Password Length", "NT Hash"]
+            dat['enabled'] = sorted(dat['enabled'], key = lambda x: -1 if x[1] is None else len(x[1]), reverse=True)
+            dat['disabled'] = sorted(dat['disabled'], key = lambda x: -1 if x[1] is None else len(x[1]), reverse=True)
+
         else:
             dat['columns'] = ["Username", "NT Hash", "Users Sharing this Hash", "Share Count", "Password"]
+            dat['enabled'] = sorted(dat['enabled'], key = lambda x: -1 if x[3] is None else x[3], reverse=True)
+            dat['disabled'] = sorted(dat['disabled'], key = lambda x: -1 if x[3] is None else x[3], reverse=True)
 
         query_output_data.append(dat)
+
+    ###
+    ### Get the Group Stats ready
+    ###
+    # TODO: Output group members in html output
+
+    print("[+] Querying for Group Statistics")
+    group_query_data = {}
+    group_data = []
+
+    query = "MATCH (u:User)-[:MemberOf]->(g:Group) RETURN DISTINCT g.name,u.name,u.cracked"
+    r = do_query(args,query)
+    resp = json.loads(r.text)['results'][0]['data']
+    for entry in resp:
+        group_name = entry['row'][0]
+        username = entry['row'][1]
+        crack_status = entry['row'][2]
+
+        if group_name not in group_query_data:
+            group_query_data[group_name] = [[username,crack_status]]
+        else:
+            group_query_data[group_name].append([username,crack_status])
+
+    for group_name in group_query_data:
+        cracked_total = sum(user[1] == True for user in group_query_data[group_name])
+        if cracked_total == 0:
+            continue
+        perc = round(100 * float(cracked_total / len(group_query_data[group_name])), 2)
+        group_data.append([group_name,perc,cracked_total,len(group_query_data[group_name])])
+    group_data = sorted(group_data, key = lambda x: x[1], reverse=True)
 
     ###
     ### Get the Overall Stats ready
     ###
 
-    print("[+] Querying for Group Statistics")
-    percent_cracked_groups = []
-    query = "MATCH p2=(u2:User)-[r2:MemberOf]->(g2:Group),p3=(u3:User {cracked:true})-[r3:MemberOf]->(g2:Group) RETURN g2.name, COUNT(DISTINCT(u3))*100/COUNT(DISTINCT(u2)), COUNT(DISTINCT(u3.name)), COUNT(DISTINCT(u2.name)) ORDER BY COUNT(DISTINCT(u3))*100/COUNT(DISTINCT(u2)) DESC"
+    print("[+] Generating Overall Statistics")
 
-    #
-    #
-    #
-    #TODO
-    #
-    # return all users of all groups, far quicker, can potentially make individual pages for each group
-    #
-
-
-
+    # all password hashes
+    query = "MATCH (u:User) WHERE EXISTS (u.cracked) RETURN u.ntds_uname,u.password,u.nt_hash"
     r = do_query(args,query)
     resp = json.loads(r.text)['results'][0]['data']
-    for entry in resp:
-        group_name = entry['row'][0]
-        percent = entry['row'][1]
-        cracked_users = entry['row'][2]
-        total_users = entry['row'][3]
-        percent_cracked_groups.append([group_name, percent, cracked_users, total_users])
-
-    percent_cracked_groups_number = len(percent_cracked_groups)
-
-    print("[+] Generating Overall Statistics")
-    num_pass_hashes = len(ntds_parsed)
+    num_pass_hashes = len(resp)
     num_pass_hashes_list = []
-    for user in ntds_parsed:
-        full_uname = '/'.join(filter(None, [user[1], user[0]]))
+    for entry in resp:
         length = ''
-        if user[5] != None:
-            length = len(user[5])
-        num_pass_hashes_list.append([full_uname, user[5], length, user[4]])
+        if entry['row'][1] != None:
+            length = len(entry['row'][1])
+        num_pass_hashes_list.append([entry['row'][0], entry['row'][1], length, entry['row'][2]])
+    num_pass_hashes_list = sorted(num_pass_hashes_list, key = lambda x: -1 if x[1] is None else len(x[1]), reverse=True)
 
-    num_uniq_hash = len(nt_hashes)
-    num_cracked = sum(cracked.values())
-    num_uniq_cracked = len(cracked)
+    # unique password hashes
+    query = "MATCH (u:User) RETURN COUNT(DISTINCT(u.nt_hash))"
+    r = do_query(args,query)
+    resp = json.loads(r.text)['results'][0]['data']
+    num_uniq_hash = resp[0]['row'][0]
+
+    # passwords cracked, uniques
+    query = "MATCH (u:User {cracked:True}) RETURN COUNT(DISTINCT(u)),COUNT(DISTINCT(u.password))"
+    r = do_query(args,query)
+    resp = json.loads(r.text)['results'][0]['data']
+    num_cracked = resp[0]['row'][0]
+    num_uniq_cracked = resp[0]['row'][1]
+
+    # password percentages
     if (num_pass_hashes > 0):
         perc_total_cracked = "{:2.2f}".format((float(num_cracked) / float(num_pass_hashes) * 100))
         perc_uniq_cracked = "{:2.2f}".format((float(num_uniq_cracked) / float(num_uniq_hash) * 100))
@@ -913,33 +958,38 @@ def dpat_func(args):
         perc_total_cracked = 00.00
         perc_uniq_cracked = 00.00
 
-    # get number of DAs to match DPAT, assume connection works since we mapped all users already
-    non_blank_lm = 0 #sum(lm_hashes.values())
-    uniq_lm = len(lm_hashes)
-    lm_hash_list = []
-    for lm_hash in lm_hashes:
-        non_blank_lm += len(lm_hashes[lm_hash])
-        for user in lm_hashes[lm_hash]:
-            lm_hash_list.append([user, lm_hash, len(lm_hashes[lm_hash])])
+    # lm hash stats
+    query = "MATCH (u:User) WHERE EXISTS (u.lm_hash) AND NOT u.lm_hash='aad3b435b51404eeaad3b435b51404ee' RETURN u.lm_hash,count(u.lm_hash)"
+    r = do_query(args,query)
+    resp = json.loads(r.text)['results'][0]['data']
+    lm_hash_counts = {}
+    for entry in resp:
+        lm_hash_counts[entry['row'][0]] = entry['row'][1]
+    non_blank_lm = sum(lm_hash_counts.values())
+    uniq_lm = len(lm_hash_counts)
 
+    # lm hash users
+    query = "MATCH (u:User) WHERE EXISTS (u.lm_hash) AND NOT u.lm_hash='aad3b435b51404eeaad3b435b51404ee' RETURN u.name,u.lm_hash"
+    r = do_query(args,query)
+    resp = json.loads(r.text)['results'][0]['data']
+
+    lm_hash_list = []
+    for entry in resp:
+        user = [entry['row'][0], sanitize(args, entry['row'][1])]
+        user.append(lm_hash_counts[entry['row'][1]])
+        lm_hash_list.append(user)
+    lm_hash_list = sorted(lm_hash_list, key = lambda x: x[2], reverse=True)
+
+    # matching username/password
+    query = "MATCH (u:User {cracked:true}) WHERE toUpper(SPLIT(u.name,'@')[0])=toUpper(u.password) RETURN u.ntds_uname,u.password,u.nt_hash"
+    r = do_query(args,query)
+    resp = json.loads(r.text)['results'][0]['data']
     user_pass_match_list = []
-    for user in cracked_user_info:
-        if cracked_user_info[user][5] == None:
-            pass
-        else:
-            if cracked_user_info[user][0].lower() == cracked_user_info[user][5].lower():
-                full_uname = '/'.join(filter(None, [cracked_user_info[user][1], cracked_user_info[user][0]]))
-                length = len(cracked_user_info[user][5])
-                user_pass_match_list.append([full_uname, cracked_user_info[user][5], length, cracked_user_info[user][4]])
+    for entry in resp:
+        user_pass_match_list.append([entry['row'][0],sanitize(args,entry['row'][1]),len(entry['row'][1]),entry['row'][2]])
     user_pass_match = len(user_pass_match_list)
 
-    # Get Password Length Stats
-    for password in cracked:
-        pw_len = len(password)
-        if (pw_len not in password_lengths):
-            password_lengths[pw_len] = 0
-        password_lengths[pw_len] += cracked[password]
-
+    # all stats
     stats = [
         [num_pass_hashes, "Password Hashes", ["NTDS Username", "Password", "Password Length", "NT Hash"], num_pass_hashes_list], #, ntds_parsed],
         [num_uniq_hash, "Unique Password Hashes"],
@@ -949,23 +999,35 @@ def dpat_func(args):
         [non_blank_lm, "LM Hashes (Non-Blank)", ["NTDS Username", "LM Hash", "Shared Count"], lm_hash_list],
         [uniq_lm, "Unique LM Hashes (Non-Blank)"],
         [user_pass_match, "Users with Username Matching Password", ["NTDS Username", "Password", "Password Length", "NT Hash"], user_pass_match_list],
-        [percent_cracked_groups_number, "Groups Cracked by Percentage",  ["Group Name", "Percent Cracked", "Cracked Users", "Total Users"], percent_cracked_groups]
+        [len(group_data), "Groups Cracked by Percentage",  ["Group Name", "Percent Cracked", "Cracked Users", "Total Users"], group_data]
     ]
+
+    # Get Password Length Stats
+    query = "MATCH (u:User {cracked:true}) WHERE NOT u.password='' RETURN  COUNT(SIZE(u.password)), SIZE(u.password) AS sz ORDER BY sz DESC"
+    r = do_query(args,query)
+    resp = json.loads(r.text)['results'][0]['data']
+    password_lengths = []
+    for entry in resp:
+        password_lengths.append(entry['row'])
 
     # Get Password (Complexity) Stats
     # sort from most reused to least reused dict to list of tuples
     # get the first instance of not repeated password to be min'd later
-    num_repeated_passwords = 0
-    cracked = sorted(cracked.items(), key=lambda x: x[1], reverse=True)
-
-    for i in range(0, len(cracked)):
-        if (cracked[i][1] == 1):
-            num_repeated_passwords = i
-            break
+    query = "MATCH (u:User {cracked:true}) WHERE NOT u.password='' RETURN COUNT(u.password) AS countpwd, u.password ORDER BY countpwd DESC"
+    r = do_query(args,query)
+    resp = json.loads(r.text)['results'][0]['data']
+    repeated_passwords = []
+    tot_num_repeated_passwords = len(resp)
+    for entry in resp:
+        if entry['row'][0] > 1:
+            repeated_passwords.append(entry['row'])
+    num_repeated_passwords = len(repeated_passwords)
 
     # clear the "cracked" tag
-    clear_query = "MATCH (u:User {cracked:true}) REMOVE u.cracked"
-    do_query(args,clear_query)
+    if not args.store and not args.noparse:
+        print("[+] Purging information from the database")
+        clear_query = "MATCH (u:User) REMOVE u.cracked REMOVE u.nt_hash REMOVE u.lm_hash REMOVE u.ntds_uname REMOVE u.password"
+        do_query(args,clear_query)
 
     ###
     ### Output methods
@@ -979,11 +1041,13 @@ def dpat_func(args):
             label = item['label']
             enable_label = label + " - Enabled"
             disable_label = label + " - Disabled"
-            item['enabled'].insert(0,enable_label)
-            item['disabled'].insert(0,disable_label)
+            item_enabled = [x[0] for x in item['enabled']]
+            item_disabled = [x[0] for x in item['disabled']]
+            item_enabled.insert(0,enable_label)
+            item_disabled.insert(0,disable_label)
 
-            full_data.append(item['enabled'])
-            full_data.append(item['disabled'])
+            full_data.append(item_enabled)
+            full_data.append(item_disabled)
 
         export_data = zip_longest(*full_data, fillvalue='')
         filename = args.outputfile.replace(".csv", "") + ".csv" #node_name.replace(" ","_") + ".csv"
@@ -1096,6 +1160,20 @@ def dpat_func(args):
                 filename = hbt.write_html_report(filebase, ''.join([stat[1].replace(' ','_'),".html"]))
                 summary_table.append((stat[0], stat[1],"<a href=\"" + filename + "\">Details</a>"))
 
+        # add pwd len stats
+
+        hbt = HtmlBuilder()
+        hbt.add_table_to_html(password_lengths, ['Count', 'Number of Characters'])
+        filename = hbt.write_html_report(filebase, "Password_Length_Stats.html")
+        summary_table.append((len(password_lengths), "Password Length Stats","<a href=\"" + filename + "\">Details</a>"))
+
+        # add repeated pwd stats
+
+        hbt = HtmlBuilder()
+        hbt.add_table_to_html(repeated_passwords, ['Count', 'Password'])
+        filename = hbt.write_html_report(filebase, "Password_Reuse_Stats.html")
+        summary_table.append((len(repeated_passwords), "Password Reuse Stats","<a href=\"" + filename + "\">Details</a>"))
+
         # add BH query results
         for item in query_output_data:
 
@@ -1115,6 +1193,7 @@ def dpat_func(args):
             filename = hbt.write_html_report(filebase, ''.join([item['label'].replace(' ','_'),".html"]))
             summary_table.append((len(all_entries), item['label'],"<a href=\"" + filename + "\">Details</a>"))
 
+        # TODO: add stats pages
 
         hb.add_table_to_html(summary_table, summary_table_headers, 2)
         hb.write_html_report(filebase, filename_report)
@@ -1147,8 +1226,8 @@ def dpat_func(args):
         print(" " + "="*86)
         print("|{:^10}|{:^75}|".format("Count", "Description"))
         print(" " + "="*86)
-        for pw_len in sorted(password_lengths.keys(), reverse=True):
-            print("|{:^10}|{:^75}|".format(password_lengths[pw_len], "{} Characters".format(pw_len)))
+        for pw_len in password_lengths:
+            print("|{:^10}|{:^75}|".format(pw_len[0], "{} Characters".format(pw_len[1])))
         print(" " + "="*86)
         print("")
         print("")
@@ -1156,9 +1235,8 @@ def dpat_func(args):
         print(" " + "="*86)
         print("|{:^10}|{:^75}|".format("Count", "Description"))
         print(" " + "="*86)
-        for i in range(0, min(num_repeated_passwords, math.ceil( len(cracked) * 0.10 ), 50)): # cap at 50 reused passwords
-            if cracked[i][0] != '':
-                print("|{:^10}|{:^75}|".format(cracked[i][1], sanitize(args, cracked[i][0])))
+        for i in range(0,min(num_repeated_passwords, math.ceil( tot_num_repeated_passwords * 0.10 ))): # cap at 50 reused passwords
+            print("|{:^10}|{:^75}|".format(repeated_passwords[i][0], sanitize(args, repeated_passwords[i][1])))
         print(" " + "="*86)
         print("")
         print("")
@@ -1239,9 +1317,11 @@ def main():
     getinfo_switch.add_argument("--nolaps",dest="nolaps",default=False,action="store_true",help="Return a list of all computers without LAPS")
     getinfo_switch.add_argument("--unconst",dest="unconstrained",default=False,action="store_true",help="Return a list of all objects configured with Unconstrained Delegation")
     getinfo_switch.add_argument("--npusers",dest="nopreauth",default=False,action="store_true",help="Return a list of all users that don't require Kerberos Pre-Auth (AS-REP roastable)")
-    getinfo_switch.add_argument("--kerb-la",dest="kerberoastableLA",default=False,action="store_true",help="Return a list of Kerberoastable users that have LA in at least one place")
+    getinfo_switch.add_argument("--kerb",dest="kerberoastable",default=False,action="store_true",help="Return a list of Kerberoastable users")
+    getinfo_switch.add_argument("--kerb-la",dest="kerberoastableLA",default=False,action="store_true",help="Return a list of Kerberoastable users that have Local Admin rights in at least one place")
     getinfo_switch.add_argument("--passnotreq",dest="passnotreq",default=False,action="store_true",help="Return a list of all users that have PasswordNotRequired flag set to true")
     getinfo_switch.add_argument("--sidhist",dest="sidhist",default=False,action="store_true",help="Return a list of objects configured with SID History")
+    getinfo_switch.add_argument("--foreignprivs",dest="foreignprivs",default=False,action="store_true",help="Return a list of objects that have controlling privileges into other domains")
     getinfo_switch.add_argument("--unsupported",dest="unsupos",default=False,action="store_true",help="Return a list of computers running an unsupported OS")
     getinfo_switch.add_argument("--sessions",dest="unamesess",default="",help="Return a list of computers that UNAME has a session on")
     getinfo_switch.add_argument("--adminto",dest="unameadminto",default="",help="Return a list of computers that UNAME is a local administrator to")
@@ -1286,13 +1366,16 @@ def main():
     addspw.add_argument("-f","--file",dest="filename",default="",required=True,help="Filename containing AD objects, one per line (must have FQDN attached)")
 
     # DPAT function parameters
-    dpat.add_argument("-n","--ntds",dest="ntdsfile",default="",required=True,help="NTDS file name")
-    dpat.add_argument("-p","--pot",dest="potfile",default="",required=True,help="Hashcat potfile")
+    dpat.add_argument("-n","--ntds",dest="ntdsfile",default="",required=False,help="NTDS file name")
+    dpat.add_argument("-p","--pot",dest="potfile",default="",required=False,help="Hashcat potfile")
+    dpat.add_argument("--noparse",dest="noparse",action="store_true",required=False,help="Don't parse any files, assume data is already stored in BloodHound")
     dpat.add_argument("-e","--password",dest="passwd",default="",required=False,help="Returns all users using the argument as a password")
     dpat.add_argument("-u","--username",dest="usern",default="",required=False,help="Returns the password for the user if cracked")
-    dpat.add_argument("-t","--threads",dest="num_threads",default=2,required=False,help="Number of threads to parse files")
+    dpat.add_argument("-t","--threads",dest="num_threads",default=2,required=False,help="Number of threads to parse files, default 2")
     dpat.add_argument("-s","--sanitize",dest="sanitize",action="store_true",required=False,help="Sanitize the report by partially redacting passwords and hashes")
-    dpat.add_argument("-o","--outputfile",dest="outputfile",default="",required=False,help="Output filename to store results, cli if none")
+    dpat.add_argument("-S","--store",dest="store",action="store_true",required=False,help="Store all NTDS/Password data within the BH database, adds password/NT Hash/etc to each mapped user for easy access")
+    dpat.add_argument("-c","--clear",dest="clear",action="store_true",required=False,help="Clear all NTDS/Password data from the BH database")
+    dpat.add_argument("-o","--outputfile",dest="outputfile",default="",required=False,help="Output filename to store results, ascii art if none")
     dpat.add_argument("--csv",dest="csv",action="store_true",required=False,help="Store the output in a CSV format")
     dpat.add_argument("--html",dest="html",action="store_true",required=False,help="Store the output in HTML format")
 
