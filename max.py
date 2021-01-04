@@ -79,7 +79,7 @@ def get_info(args):
             "columns" : ["GroupName","MemberName"]
         },
         "das" : {
-            "query" : "MATCH p=(n:User)-[r:MemberOf*1..]->(g:Group) WHERE g.objectid ENDS WITH '-512' RETURN DISTINCT n.name",
+            "query" : "MATCH (n:User)-[r:MemberOf*1..]->(g:Group) WHERE g.objectid ENDS WITH '-512' RETURN DISTINCT n.name",
             "columns" : ["UserName"]
         },
         "dasess" : {
@@ -152,7 +152,7 @@ def get_info(args):
         },
         "foreignprivs" : {
             "query" : "MATCH p=(n1)-[r]->(n2) WHERE NOT n1.domain=n2.domain RETURN DISTINCT n1.name,TYPE(r),n2.name ORDER BY TYPE(r)",
-            "columns" : ["NodeName","EdgeName","VictimNodeName"]
+            "columns" : ["ObjectName","EdgeName","VictimObjectName"]
         }
     }
 
@@ -721,7 +721,7 @@ def dpat_func(args):
 
     if args.usern:
         print("[+] Searching for password for user {}".format(args.usern))
-        query = "MATCH (u:User) WHERE u.name='{uname}' OR toUpper(u.ntds_uname)='{uname}' RETURN u.name,u.password".format(uname=args.usern.upper().replace("\\","\\\\").replace("'","\\'"))
+        query = "MATCH (u:User) WHERE toUpper(u.name)='{uname}' OR toUpper(u.ntds_uname)='{uname}' RETURN u.name,u.password".format(uname=args.usern.upper().replace("\\","\\\\").replace("'","\\'"))
         r = do_query(args,query)
         resp = json.loads(r.text)['results'][0]['data']
         if resp == []:
@@ -744,6 +744,10 @@ def dpat_func(args):
         {
             'query' : "MATCH (u:User {cracked:true}) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
             'label' : "All User Accounts Cracked"
+        },
+        {
+            'query' : "MATCH p=(u:User {cracked:true})-[r:MemberOf*1..]->(g:Group {highvalue:true}) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
+            'label' : "High Value User Accounts Cracked"
         },
         {
             'query' : "MATCH (g:Group) WHERE g.objectid ENDS WITH '-512' MATCH (u:User)-[r:MemberOf*1..]->(g) RETURN DISTINCT u.enabled,u.ntds_uname,u.nt_hash,u.password",
@@ -1350,8 +1354,8 @@ def main():
     query.add_argument("QUERY",help="Query designation")
 
     # EXPORT function parameters
-    export.add_argument("NODE_NAME",help="Full name of node to extract info about (UNAME@DOMAIN/COMP.DOMAIN)")
-    export.add_argument("-t","--transitive",dest="transitive",action="store_true",help="Incorporate rights granted through nested groups (beta)")
+    export.add_argument("NODENAME",help="Full name of node to extract info about (UNAME@DOMAIN/COMP.DOMAIN)")
+    # export.add_argument("-t","--transitive",dest="transitive",action="store_true",help="Incorporate rights granted through nested groups ()")
 
     # DELETEEDGE function parameters
     deleteedge.add_argument("EDGENAME",help="Edge name, example: CanRDP, ExecuteDCOM, etc")
@@ -1375,7 +1379,7 @@ def main():
     dpat.add_argument("-s","--sanitize",dest="sanitize",action="store_true",required=False,help="Sanitize the report by partially redacting passwords and hashes")
     dpat.add_argument("-S","--store",dest="store",action="store_true",required=False,help="Store all NTDS/Password data within the BH database, adds password/NT Hash/etc to each mapped user for easy access")
     dpat.add_argument("-c","--clear",dest="clear",action="store_true",required=False,help="Clear all NTDS/Password data from the BH database")
-    dpat.add_argument("-o","--outputfile",dest="outputfile",default="",required=False,help="Output filename to store results, ascii art if none")
+    dpat.add_argument("-o","--outputfile",dest="outputfile",default="",required=False,help="Output filename to store results, ASCII art if not set")
     dpat.add_argument("--csv",dest="csv",action="store_true",required=False,help="Store the output in a CSV format")
     dpat.add_argument("--html",dest="html",action="store_true",required=False,help="Store the output in HTML format")
 

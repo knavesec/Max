@@ -68,3 +68,6 @@ python3 max.py dpat --noparse --username USER1@DOMAIN.LOCAL
 
 
 #### Output Examples
+
+![HTML Output](https://github.com/knavesec/Max/blob/dpat/wiki/screenshots/dpat-htmloutput.png "HTML Output")
+![HTML Output2](https://github.com/knavesec/Max/blob/dpat/wiki/screenshots/dpat-html-hashes.png "HTML Output2")
