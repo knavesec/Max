@@ -10,7 +10,7 @@ A simple suite of tools:
 - [query](https://github.com/knavesec/Max/blob/dpat/wiki/query.md) - Run a raw Cypher query and return output
 - [export](https://github.com/knavesec/Max/blob/dpat/wiki/export.md) - Export all outbound controlling privileges of a domain object to a CSV file
 - [del-edge](https://github.com/knavesec/Max/blob/dpat/wiki/del-edge.md) - Delete an edge from the database
-- [add-spns](https://github.com/knavesec/Max/blob/dpat/wiki/add-spns.mds) - Create HasSPNConfigured relationships, new attack primitive
+- [add-spns](https://github.com/knavesec/Max/blob/dpat/wiki/add-spns.md) - Create HasSPNConfigured relationships, new attack primitive
 - [add-spw](https://github.com/knavesec/Max/blob/dpat/wiki/add-spw.md) - Create SharesPasswordWith relationships
 - [dpat](https://github.com/knavesec/Max/blob/dpat/wiki/dpat.md) - The BloodHound Domain Password Audit Tool (DPAT)
 - [pet-max](https://github.com/knavesec/Max/blob/dpat/wiki/pet-max.md) - Dogsay, happiness for stressful engagements
@@ -86,7 +86,7 @@ python3 max.py add-spns -i getuserspns-raw-output.txt
 
 DPAT
 ```
-python3 max.py dpat -n ~/client/ntds.dit -p ~/.hashcat/hashcat.potfile -o ouputdir --html --sanitize 
+python3 max.py dpat -n ~/client/ntds.dit -p ~/.hashcat/hashcat.potfile -o ouputdir --html --sanitize
 ```
 
 Pet max
