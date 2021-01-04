@@ -14,10 +14,12 @@ A few things that this module will look for:
 #### Notes
 
 * If you already have a parsed and cracked NTDS.dit file, you're ready for the tool. If you haven't, or don't know how to do such, see the original DPAT tool: https://github.com/clr2of8/DPAT. These tools are very similar, but the Max version interacts with BloodHound and doesn't require manually retrieving domain group members.
+* If your AD environment contains a high level of objects (>50-75k), some of these queries may take a long time, consider using the `--less` flag to eliminate high-intensity queries
 
 * This function uploads usernames/hashes/passwords to the BloodHound database, then uses Cypher queries to perfom analytics. Afterwards it will cleanse the data
 * The `--store` flag will make sure the parsed data stays in the database after completion, if the data is already stored then you can use the `--noparse` flag to skip the initial parsing and mapping phase
 * The `--clear` flag will remove all independently
+* The `--less` flag won't run intensive queries
 * The `--sanitize` flag will make sure all passwords and hashes are partially obfuscated
 * The `-o/--outputfile` will specify where the output file/s are written, for the `--html` flag the output will be a directory with all the files, for the `--csv` flag it will be a single filename
 * The `--threads` flag will increase the amount of threads used in NTDS & Potfile parsing, as well as mapping the users to the BloodHound database. It will not impact the queries/stats themselves

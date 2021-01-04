@@ -797,7 +797,9 @@ def dpat_func(args):
             "query" : "MATCH (u:User {cracked:true,pwdneverexpires:true}) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
             "label" : "Accounts With Passwords That Never Expire Cracked"
         },
+    ]
 
+    intense_queries = [
         {
             "query" : "MATCH (u:User {cracked:true}),(n {unconstraineddelegation:true}),p=shortestPath((u)-[r*1..]->(n)) WHERE NONE (r IN relationships(p) WHERE type(r)= 'GetChanges') AND NONE (r in relationships(p) WHERE type(r)='GetChangesAll') AND NOT u=n RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
             "label" : "Accounts With Paths To Unconstrained Delegation Objects Cracked"
@@ -819,6 +821,9 @@ def dpat_func(args):
             "label" : "Accounts With Group Delegated Controlling Privileges Cracked"
         }
     ]
+
+    if not args.less:
+        queries = queries + intense_queries
 
     """
     [
@@ -1373,6 +1378,7 @@ def main():
     dpat.add_argument("-n","--ntds",dest="ntdsfile",default="",required=False,help="NTDS file name")
     dpat.add_argument("-p","--pot",dest="potfile",default="",required=False,help="Hashcat potfile")
     dpat.add_argument("--noparse",dest="noparse",action="store_true",required=False,help="Don't parse any files, assume data is already stored in BloodHound")
+    dpat.add_argument("--less",dest="less",action="store_true",required=False,help="Don't include high-intensity queries, recommended for large-scale AD environments (>50-75k objects)")
     dpat.add_argument("-e","--password",dest="passwd",default="",required=False,help="Returns all users using the argument as a password")
     dpat.add_argument("-u","--username",dest="usern",default="",required=False,help="Returns the password for the user if cracked")
     dpat.add_argument("-t","--threads",dest="num_threads",default=2,required=False,help="Number of threads to parse files, default 2")
