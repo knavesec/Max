@@ -4,19 +4,19 @@
 
 New Release:
 
-- [dpat](https://github.com/knavesec/Max/blob/dpat/wiki/dpat.md) - The BloodHound Domain Password Audit Tool (DPAT)
+- [dpat](https://github.com/knavesec/Max/blob/master/wiki/dpat.md) - The BloodHound Domain Password Audit Tool (DPAT)
 
 A simple suite of tools:
-- [get-info](https://github.com/knavesec/Max/blob/dpat/wiki/get-info.md) - Pull lists of information from the Neo4j database
-- [mark-owned](https://github.com/knavesec/Max/blob/dpat/wiki/mark-owned.md) - Mark a list of objects as Owned
-- [mark-hvt](https://github.com/knavesec/Max/blob/dpat/wiki/mark-hvt.md) - Mark a list of objects as High Value Targets
-- [query](https://github.com/knavesec/Max/blob/dpat/wiki/query.md) - Run a raw Cypher query and return output
-- [export](https://github.com/knavesec/Max/blob/dpat/wiki/export.md) - Export all outbound controlling privileges of a domain object to a CSV file
-- [del-edge](https://github.com/knavesec/Max/blob/dpat/wiki/del-edge.md) - Delete an edge from the database
-- [add-spns](https://github.com/knavesec/Max/blob/dpat/wiki/add-spns.md) - Create HasSPNConfigured relationships, new attack primitive
-- [add-spw](https://github.com/knavesec/Max/blob/dpat/wiki/add-spw.md) - Create SharesPasswordWith relationships
-- [dpat](https://github.com/knavesec/Max/blob/dpat/wiki/dpat.md) - The BloodHound Domain Password Audit Tool (DPAT)
-- [pet-max](https://github.com/knavesec/Max/blob/dpat/wiki/pet-max.md) - Dogsay, happiness for stressful engagements
+- [get-info](https://github.com/knavesec/Max/blob/master/wiki/get-info.md) - Pull lists of information from the Neo4j database
+- [mark-owned](https://github.com/knavesec/Max/blob/master/wiki/mark-owned.md) - Mark a list of objects as Owned
+- [mark-hvt](https://github.com/knavesec/Max/blob/master/wiki/mark-hvt.md) - Mark a list of objects as High Value Targets
+- [query](https://github.com/knavesec/Max/blob/master/wiki/query.md) - Run a raw Cypher query and return output
+- [export](https://github.com/knavesec/Max/blob/master/wiki/export.md) - Export all outbound controlling privileges of a domain object to a CSV file
+- [del-edge](https://github.com/knavesec/Max/blob/master/wiki/del-edge.md) - Delete an edge from the database
+- [add-spns](https://github.com/knavesec/Max/blob/master/wiki/add-spns.md) - Create HasSPNConfigured relationships, new attack primitive
+- [add-spw](https://github.com/knavesec/Max/blob/master/wiki/add-spw.md) - Create SharesPasswordWith relationships
+- [dpat](https://github.com/knavesec/Max/blob/master/wiki/dpat.md) - The BloodHound Domain Password Audit Tool (DPAT)
+- [pet-max](https://github.com/knavesec/Max/blob/master/wiki/pet-max.md) - Dogsay, happiness for stressful engagements
 
 This was released with screenshots & use-cases on the following blogs: [Max Release](https://whynotsecurity.com/blog/max/),  [Updates & Primitives](https://whynotsecurity.com/blog/max2/) & [DPAT](https://whynotsecurity.com/blog/max3/)
 
