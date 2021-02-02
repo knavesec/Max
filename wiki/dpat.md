@@ -1,6 +1,6 @@
 ## Module: dpat
 
-Module to perform password analytics based off the BloodHound database, an NTDS.dit file, and a password cracking potfile (JTR/hashcat).
+The Bloodhound Domain Password Audit Tool. Module to perform password analytics based off the BloodHound database, an NTDS.dit file, and a password cracking potfile (JTR/hashcat).
 
 A few things that this module will look for:
 * Password length & reuse stats
@@ -12,11 +12,13 @@ A few things that this module will look for:
 
 This module with full usage details was released in this blog post: [whynotsecurity.com/blog/max3](https://whynotsecurity.com/blog/max3/)
 
+[Back to Max](https://github.com/knavesec/Max)
+
+#### Output Examples
+
 ![HTML Output](https://github.com/knavesec/Max/blob/dpat/wiki/screenshots/dpat-htmloutput.png)
 
 ![HTML Hashes](https://github.com/knavesec/Max/blob/dpat/wiki/screenshots/dpat-htmlhashes.png)
-
-[Back to Max](https://github.com/knavesec/Max)
 
 
 #### Notes
@@ -33,12 +35,6 @@ This module with full usage details was released in this blog post: [whynotsecur
 * The `--threads` flag will increase the amount of threads used in NTDS & Potfile parsing, as well as mapping the users to the BloodHound database. It will not impact the queries/stats themselves
 * If you're looking for a specific user's password, you can search using the `-u/--username` flag and inputting the username in either BloodHound format (`user@domain.local`) or NTDS format (`domain.local/user`). This is best used with the `--noparse` option when things are already stored in the DB
 * If you're looking for all accounts using a certain password, you can search using the `-e/--password` flag and inputting the target password. Again, best used with the `--noparse` flag with info already stored
-
-
-#### Output Examples
-
-![HTML Output](https://github.com/knavesec/Max/blob/dpat/wiki/screenshots/dpat-htmloutput.png "HTML Output")
-![HTML Output2](https://github.com/knavesec/Max/blob/dpat/wiki/screenshots/dpat-htmlhashes.png "HTML Output2")
 
 
 #### NTDS.dit Extraction & Parsing
