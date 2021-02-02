@@ -18,21 +18,24 @@ A simple suite of tools:
 - [dpat](https://github.com/knavesec/Max/blob/dpat/wiki/dpat.md) - The BloodHound Domain Password Audit Tool (DPAT)
 - [pet-max](https://github.com/knavesec/Max/blob/dpat/wiki/pet-max.md) - Dogsay, happiness for stressful engagements
 
-This was released with screenshots & use-cases on the following blogs: https://whynotsecurity.com/blog/max/ & https://whynotsecurity.com/blog/max2/
+This was released with screenshots & use-cases on the following blogs: [Max Release](https://whynotsecurity.com/blog/max/),  [Updates & Primitives](https://whynotsecurity.com/blog/max2/) & [DPAT](https://whynotsecurity.com/blog/max3/)
 
 A new potential attack primitive was added to this tool during my research, see the `add-spns` section for full details.
+
 
 ## Usage
 
 ### Installation
 
-Ideally there shouldn't be much to install, but I've included a requirements.txt file just in case. Tested on Kali linux. 
+Ideally there shouldn't be much to install, but I've included a requirements.txt file just in case. Tested on Kali linux.
 
 `pip3 install -r requirements.txt`
 
 ### Neo4j Creds
 
 Neo4j credentials can be hardcoded at the beginning of the script *OR* they can be provided as CLI
+
+`python3 max.py -u neo4j -p neo4j {module} {args}`
 
 ### Quick Use
 

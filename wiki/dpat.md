@@ -10,7 +10,7 @@ A few things that this module will look for:
 * Accounts with paths to unconstrained delegation objects cracked
 * ... and more!
 
-This module with full usage details was released in this blog post: [whynotsecurity](https://URL)
+This module with full usage details was released in this blog post: [whynotsecurity.com/blog/max3](https://whynotsecurity.com/blog/max3/)
 
 ![HTML Output](https://github.com/knavesec/Max/blob/dpat/wiki/screenshots/dpat-htmloutput.png)
 
