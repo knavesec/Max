@@ -7,18 +7,19 @@ import argparse
 import json
 import random
 import re
-from itertools import zip_longest
 import csv
 import binascii
 import math
 import os
 import numpy
 import multiprocessing
+import webbrowser
+from distutils.util import strtobool
 try:
     import html as htmllib
 except ImportError:
     import cgi as htmllib
-from itertools import takewhile, repeat
+from itertools import takewhile, repeat, zip_longest
 
 
 # option to hardcode URL & URI
@@ -86,8 +87,12 @@ def get_info(args):
             "query" : "MATCH (u:User)-[r:MemberOf*1..]->(g:Group) WHERE g.objectid ENDS WITH '-512' WITH COLLECT(u) AS das MATCH (u2:User)<-[r2:HasSession]-(c:Computer) WHERE u2 IN das RETURN DISTINCT u2.name,c.name ORDER BY u2.name",
             "columns" : ["UserName","ComputerName"]
         },
+        "dcs" : {
+            "query" : "MATCH (n:Computer)-[r:MemberOf*1..]->(g:Group) WHERE g.objectid ENDS WITH '-516' RETURN DISTINCT n.name",
+            "columns" : ["ComputerName"]
+        },
         "unconstrained" : {
-            "query" : "MATCH (n) WHERE n.unconstraineddelegation=TRUE RETURN n.name",
+            "query" : "MATCH (g:Group) WHERE g.objectid ENDS WITH '-516' MATCH (c:Computer)-[MemberOf]->(g) WITH COLLECT(c) AS dcs MATCH (n {unconstraineddelegation:true}) WHERE NOT n IN dcs RETURN n.name",
             "columns" : ["ObjectName"]
         },
         "nopreauth" : {
@@ -176,6 +181,9 @@ def get_info(args):
     elif (args.dasess):
         query = queries["dasess"]["query"]
         cols = queries["dasess"]["columns"]
+    elif (args.dcs):
+        query = queries["dcs"]["query"]
+        cols = queries["dcs"]["columns"]
     elif (args.unconstrained):
         query = queries["unconstrained"]["query"]
         cols = queries["unconstrained"]["columns"]
@@ -370,7 +378,7 @@ def export_func(args):
         "SharesPasswordWith"
     ]
 
-    node_name = args.NODE_NAME.upper().strip()
+    node_name = args.NODENAME.upper().strip()
     query = "MATCH (n1 {{name:'{node_name}'}}) MATCH (n1)-[r:{edge}]->(n2) RETURN DISTINCT n2.name"
 
     data = []
@@ -568,6 +576,7 @@ def dpat_func(args):
             ntds_parsed.append(to_append)
 
     def map_users(users):
+        count = 0
         for user in users:
             try:
                 nt_hash = user[4]
@@ -603,12 +612,15 @@ def dpat_func(args):
                     bh_users = json.loads(r2.text)['results'][0]['data']
 
                 # if bh_users == [] then the user was not found in BH
+                if bh_users != []:
+                    count = count + 1
 
             except Exception as g:
                 print('{}'.format(g))
                 print(query1)
                 pass
 
+        return count
 
     query_counts = {}
 
@@ -618,8 +630,8 @@ def dpat_func(args):
         do_query(args,clear_query)
         return
 
-    if ((args.outputfile) and (not args.csv and not args.html)):
-        print("[-] Error, --outputfile requires --csv and/or --html type output flags")
+    if ((args.output) and (not args.csv and not args.html)):
+        print("[-] Error, --output requires --csv and/or --html type output flags")
         return
 
     if not args.noparse:
@@ -629,8 +641,8 @@ def dpat_func(args):
         else:
             print("[-] Error, Need NTDS file")
             return
-        if args.potfile == None:
-            print("[-] Error, Need potfile")
+        if args.crackfile == None:
+            print("[-] Error, Need crackfile")
             return
 
         try:
@@ -664,7 +676,7 @@ def dpat_func(args):
             # password stats like counting reused cracked passwords
 
             potfile = {}
-            with open(args.potfile,'r') as pot:
+            with open(args.crackfile,'r') as pot:
                 for line in pot.readlines():
                     try:
                         line = line.strip().replace("$NT$", "").replace("$LM$", "")
@@ -697,7 +709,13 @@ def dpat_func(args):
                 p_.join()
 
 
-            print("[+] BloodHound data queried successfully, {} NTDS users mapped to BH data".format(len(ntds_parsed)))
+            count_query = "MATCH (u:User) WHERE EXISTS(u.cracked) RETURN COUNT(u.name)"
+            r = do_query(args,count_query)
+            resp = json.loads(r.text)['results'][0]['data']
+            count = resp[0]['row'][0]
+            print("[+] BloodHound data queried successfully, {} NTDS users mapped to BH data".format(count))
+            if count < 10:
+                print("[-] Warning: Less than 10 users mapped to BloodHound entries, verify the NTDS data matches the Neo4j data, continuing...")
 
         except Exception as e:
             print("[-] Error, {}".format(e))
@@ -710,7 +728,7 @@ def dpat_func(args):
     # TODO: Output other info like hashes, full names, etc
 
     if args.passwd:
-        print("[+] Searching for users with password {}".format(args.passwd))
+        print("[+] Searching for users with password '{}'".format(args.passwd))
         query = "MATCH (u:User {{cracked:true}}) WHERE u.password='{pwd}' RETURN u.name".format(pwd=args.passwd.replace("\\","\\\\").replace("'","\\'"))
         r = do_query(args,query)
         resp = json.loads(r.text)['results'][0]['data']
@@ -824,6 +842,9 @@ def dpat_func(args):
 
     if not args.less:
         queries = queries + intense_queries
+    else:
+        print("[*] Less flag enabled, omitting high-intensity queries")
+
 
     """
     [
@@ -901,30 +922,32 @@ def dpat_func(args):
     ###
     # TODO: Output group members in html output
 
-    print("[+] Querying for Group Statistics")
-    group_query_data = {}
-    group_data = []
+    if not args.less:
 
-    query = "MATCH (u:User)-[:MemberOf]->(g:Group) RETURN DISTINCT g.name,u.name,u.cracked"
-    r = do_query(args,query)
-    resp = json.loads(r.text)['results'][0]['data']
-    for entry in resp:
-        group_name = entry['row'][0]
-        username = entry['row'][1]
-        crack_status = entry['row'][2]
+        print("[+] Querying for Group Statistics")
+        group_query_data = {}
+        group_data = []
 
-        if group_name not in group_query_data:
-            group_query_data[group_name] = [[username,crack_status]]
-        else:
-            group_query_data[group_name].append([username,crack_status])
+        query = "MATCH (u:User)-[:MemberOf]->(g:Group) RETURN DISTINCT g.name,u.name,u.cracked"
+        r = do_query(args,query)
+        resp = json.loads(r.text)['results'][0]['data']
+        for entry in resp:
+            group_name = entry['row'][0]
+            username = entry['row'][1]
+            crack_status = entry['row'][2]
 
-    for group_name in group_query_data:
-        cracked_total = sum(user[1] == True for user in group_query_data[group_name])
-        if cracked_total == 0:
-            continue
-        perc = round(100 * float(cracked_total / len(group_query_data[group_name])), 2)
-        group_data.append([group_name,perc,cracked_total,len(group_query_data[group_name])])
-    group_data = sorted(group_data, key = lambda x: x[1], reverse=True)
+            if group_name not in group_query_data:
+                group_query_data[group_name] = [[username,crack_status]]
+            else:
+                group_query_data[group_name].append([username,crack_status])
+
+        for group_name in group_query_data:
+            cracked_total = sum(user[1] == True for user in group_query_data[group_name])
+            if cracked_total == 0:
+                continue
+            perc = round(100 * float(cracked_total / len(group_query_data[group_name])), 2)
+            group_data.append([group_name,perc,cracked_total,len(group_query_data[group_name])])
+        group_data = sorted(group_data, key = lambda x: x[1], reverse=True)
 
     ###
     ### Get the Overall Stats ready
@@ -998,19 +1021,6 @@ def dpat_func(args):
         user_pass_match_list.append([entry['row'][0],sanitize(args,entry['row'][1]),len(entry['row'][1]),entry['row'][2]])
     user_pass_match = len(user_pass_match_list)
 
-    # all stats
-    stats = [
-        [num_pass_hashes, "Password Hashes", ["NTDS Username", "Password", "Password Length", "NT Hash"], num_pass_hashes_list], #, ntds_parsed],
-        [num_uniq_hash, "Unique Password Hashes"],
-        [num_cracked, "Passwords Discovered Through Cracking"],
-        [perc_total_cracked, "Percent of Passwords Cracked"],
-        [perc_uniq_cracked, "Percent of Unique Passwords Cracked"],
-        [non_blank_lm, "LM Hashes (Non-Blank)", ["NTDS Username", "LM Hash", "Shared Count"], lm_hash_list],
-        [uniq_lm, "Unique LM Hashes (Non-Blank)"],
-        [user_pass_match, "Users with Username Matching Password", ["NTDS Username", "Password", "Password Length", "NT Hash"], user_pass_match_list],
-        [len(group_data), "Groups Cracked by Percentage",  ["Group Name", "Percent Cracked", "Cracked Users", "Total Users"], group_data]
-    ]
-
     # Get Password Length Stats
     query = "MATCH (u:User {cracked:true}) WHERE NOT u.password='' RETURN  COUNT(SIZE(u.password)), SIZE(u.password) AS sz ORDER BY sz DESC"
     r = do_query(args,query)
@@ -1031,6 +1041,45 @@ def dpat_func(args):
         if entry['row'][0] > 1:
             repeated_passwords.append(entry['row'])
     num_repeated_passwords = len(repeated_passwords)
+
+    # Passwords not meeting Complexity Requirement
+    special_chars = """`~!@#$%^&*()-_=+,<.>/?;:"'{}[]|\\"""
+    rules = [
+        lambda s: any(x.isupper() for x in s),
+        lambda s: any(x.islower() for x in s),
+        lambda s: any(x.isdigit() for x in s),
+        lambda s: any(x in special_chars for x in s)
+    ]
+
+    query = "MATCH (u:User {cracked:true}) WHERE NOT u.password='' RETURN u.password,u.ntds_uname"
+    r = do_query(args,query)
+    resp = json.loads(r.text)['results'][0]['data']
+    password_complexity = []
+    for entry in resp:
+        if sum(rule(entry['row'][0]) for rule in rules) >= 3:
+            password_complexity.append([entry['row'][1],entry['row'][0],True])
+        else:
+            password_complexity.append([entry['row'][1],entry['row'][0],False])
+    password_complexity = sorted(password_complexity, key = lambda x: x[2], reverse=True)
+
+    # all stats
+    stats = [
+        [num_pass_hashes, "Password Hashes", ["NTDS Username", "Password", "Password Length", "NT Hash"], num_pass_hashes_list], #, ntds_parsed],
+        [num_uniq_hash, "Unique Password Hashes"],
+        [num_cracked, "Passwords Discovered Through Cracking"],
+        [perc_total_cracked, "Percent of Passwords Cracked"],
+        [perc_uniq_cracked, "Percent of Unique Passwords Cracked"],
+        [non_blank_lm, "LM Hashes (Non-Blank)", ["NTDS Username", "LM Hash", "Shared Count"], lm_hash_list],
+        [uniq_lm, "Unique LM Hashes (Non-Blank)"],
+        [user_pass_match, "Users with Username Matching Password", ["NTDS Username", "Password", "Password Length", "NT Hash"], user_pass_match_list],
+        [len(password_lengths), "Password Length Stats", ['Count', 'Number of Characters'], password_lengths],
+        [len(password_complexity), "Password Complexity Stats", ['Username', 'Password', "Meets Complexity Requirements"], password_complexity],
+        [len(repeated_passwords), "Password Reuse Stats", ['Count', 'Password'], repeated_passwords],
+    ]
+
+    if not args.less:
+        stats.append([len(group_data), "Groups Cracked by Percentage",  ["Group Name", "Percent Cracked", "Cracked Users", "Total Users"], group_data])
+
 
     # clear the "cracked" tag
     if not args.store and not args.noparse:
@@ -1059,21 +1108,21 @@ def dpat_func(args):
             full_data.append(item_disabled)
 
         export_data = zip_longest(*full_data, fillvalue='')
-        filename = args.outputfile.replace(".csv", "") + ".csv" #node_name.replace(" ","_") + ".csv"
+        filename = args.output.replace(".csv", "") + ".csv" #node_name.replace(" ","_") + ".csv"
         with open(filename,'w', encoding='utf-8', newline='') as file:
             wr = csv.writer(file)
             wr.writerows(export_data)
         file.close()
-        print("[+] All data written to {}.csv".format(args.outputfile))
+        print("[+] All data written to {}.csv".format(args.output))
 
     # use "if" specifically so you can output both html & csv on the same run
     # This code heavily modified from the original DPAT tool, credit where it's due
     if args.html:
 
-        if not os.path.exists(args.outputfile):
-            os.makedirs(args.outputfile)
+        if not os.path.exists(args.output):
+            os.makedirs(args.output)
 
-        filebase = args.outputfile + "/"
+        filebase = args.output + "/"
         filename_report = "Report.html"
 
         # write report.css
@@ -1169,20 +1218,6 @@ def dpat_func(args):
                 filename = hbt.write_html_report(filebase, ''.join([stat[1].replace(' ','_'),".html"]))
                 summary_table.append((stat[0], stat[1],"<a href=\"" + filename + "\">Details</a>"))
 
-        # add pwd len stats
-
-        hbt = HtmlBuilder()
-        hbt.add_table_to_html(password_lengths, ['Count', 'Number of Characters'])
-        filename = hbt.write_html_report(filebase, "Password_Length_Stats.html")
-        summary_table.append((len(password_lengths), "Password Length Stats","<a href=\"" + filename + "\">Details</a>"))
-
-        # add repeated pwd stats
-
-        hbt = HtmlBuilder()
-        hbt.add_table_to_html(repeated_passwords, ['Count', 'Password'])
-        filename = hbt.write_html_report(filebase, "Password_Reuse_Stats.html")
-        summary_table.append((len(repeated_passwords), "Password Reuse Stats","<a href=\"" + filename + "\">Details</a>"))
-
         # add BH query results
         for item in query_output_data:
 
@@ -1202,15 +1237,27 @@ def dpat_func(args):
             filename = hbt.write_html_report(filebase, ''.join([item['label'].replace(' ','_'),".html"]))
             summary_table.append((len(all_entries), item['label'],"<a href=\"" + filename + "\">Details</a>"))
 
-        # TODO: add stats pages
-
         hb.add_table_to_html(summary_table, summary_table_headers, 2)
         hb.write_html_report(filebase, filename_report)
         print("[+] Report has been written to the \"" + filename_report + "\" file in the \"" + filebase + "\" directory")
 
-        # print(css_styling)
+        # prompt user to open the report
+        # the code to prompt user to open the file was borrowed from the DPAT tool which borrowed it from the EyeWitness tool https://github.com/ChrisTruncer/EyeWitness
+        print('[+] Would you like to open the report now? [Y/n]')
+        while True:
+            try:
+                response = input().lower().rstrip('\r')
+                if ((response == "") or (strtobool(response))):
+                    webbrowser.open(os.path.join("file://" + os.getcwd(),
+                                                 filebase, filename_report))
+                    break
+                else:
+                    break
+            except ValueError:
+                print("[-] Please respond with y or n")
 
-    if args.outputfile == "":
+
+    if args.output == "":
         print("[+] Outputting Stats to Terminal...")
 
         # Output to CLI
@@ -1311,7 +1358,7 @@ def main():
     deleteedge = switch.add_parser("del-edge",help="Remove every edge of a certain type. Why filter when you can delete? (Warning, irreversible)")
     addspns = switch.add_parser("add-spns",help="Create 'HasSPNConfigured' relationships with targets from a file or stored BloodHound data. Adds possible path of compromise edge via cleartext service account credentials stored within LSA Secrets")
     addspw = switch.add_parser("add-spw",help="Create 'SharesPasswordWith' relationships with targets from a file. Adds edge indicating two objects share a password (repeated local administrator)")
-    dpat = switch.add_parser("dpat",help="Based off Domain Password Audit Tool, run cracked user-password analysis tied with BloodHound through a Hashcat potfile & NTDS")
+    dpat = switch.add_parser("dpat",help="BloodHound Domain Password Audit Tool, run cracked user-password analysis tied with BloodHound through a Hashcat potfile & NTDS")
     petmax = switch.add_parser("pet-max",help="Pet max, hes a good boy (pet me again, I say different things)")
 
     # GETINFO function parameters
@@ -1323,6 +1370,7 @@ def main():
     getinfo_switch.add_argument("--group-members",dest="groupmems",default="",help="Return a list of all members of an input GROUP")
     getinfo_switch.add_argument("--das",dest="das",default=False,action="store_true",help="Return a list of all Domain Admins")
     getinfo_switch.add_argument("--dasessions",dest="dasess",default=False,action="store_true",help="Return a list of Domain Admin sessions")
+    getinfo_switch.add_argument("--dcs",dest="dcs",default=False,action="store_true",help="Return a list of all Domain Controllers")
     getinfo_switch.add_argument("--nolaps",dest="nolaps",default=False,action="store_true",help="Return a list of all computers without LAPS")
     getinfo_switch.add_argument("--unconst",dest="unconstrained",default=False,action="store_true",help="Return a list of all objects configured with Unconstrained Delegation")
     getinfo_switch.add_argument("--npusers",dest="nopreauth",default=False,action="store_true",help="Return a list of all users that don't require Kerberos Pre-Auth (AS-REP roastable)")
@@ -1375,17 +1423,17 @@ def main():
     addspw.add_argument("-f","--file",dest="filename",default="",required=True,help="Filename containing AD objects, one per line (must have FQDN attached)")
 
     # DPAT function parameters
-    dpat.add_argument("-n","--ntds",dest="ntdsfile",default="",required=False,help="NTDS file name")
-    dpat.add_argument("-p","--pot",dest="potfile",default="",required=False,help="Hashcat potfile")
+    dpat.add_argument("-n","--ntds",dest="ntdsfile",default=None,required=False,help="NTDS file name")
+    dpat.add_argument("-c","--crackfile",dest="crackfile",default=None,required=False,help="Potfile of cracked passwords, in either Hashcat/JTR format")
     dpat.add_argument("--noparse",dest="noparse",action="store_true",required=False,help="Don't parse any files, assume data is already stored in BloodHound")
     dpat.add_argument("--less",dest="less",action="store_true",required=False,help="Don't include high-intensity queries, recommended for large-scale AD environments (>50-75k objects)")
-    dpat.add_argument("-e","--password",dest="passwd",default="",required=False,help="Returns all users using the argument as a password")
+    dpat.add_argument("-p","--password",dest="passwd",default="",required=False,help="Returns all users using the argument as a password")
     dpat.add_argument("-u","--username",dest="usern",default="",required=False,help="Returns the password for the user if cracked")
     dpat.add_argument("-t","--threads",dest="num_threads",default=2,required=False,help="Number of threads to parse files, default 2")
     dpat.add_argument("-s","--sanitize",dest="sanitize",action="store_true",required=False,help="Sanitize the report by partially redacting passwords and hashes")
     dpat.add_argument("-S","--store",dest="store",action="store_true",required=False,help="Store all NTDS/Password data within the BH database, adds password/NT Hash/etc to each mapped user for easy access")
-    dpat.add_argument("-c","--clear",dest="clear",action="store_true",required=False,help="Clear all NTDS/Password data from the BH database")
-    dpat.add_argument("-o","--outputfile",dest="outputfile",default="",required=False,help="Output filename to store results, ASCII art if not set")
+    dpat.add_argument("--clear",dest="clear",action="store_true",required=False,help="Clear all NTDS/Password data from the BH database")
+    dpat.add_argument("-o","--output",dest="output",default="",required=False,help="Output file/dir name to store results, ASCII art if not set")
     dpat.add_argument("--csv",dest="csv",action="store_true",required=False,help="Store the output in a CSV format")
     dpat.add_argument("--html",dest="html",action="store_true",required=False,help="Store the output in HTML format")
 

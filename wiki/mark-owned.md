@@ -2,6 +2,8 @@
 
 Bulk import of owned assets into the database
 
+[Back to Max](https://github.com/knavesec/Max)
+
 
 #### Notes
 

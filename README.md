@@ -1,7 +1,10 @@
-
 # Maximizing BloodHound with a simple suite of tools
 
 ## Description
+
+New Release:
+
+- [dpat](https://github.com/knavesec/Max/blob/dpat/wiki/dpat.md) - The BloodHound Domain Password Audit Tool (DPAT)
 
 A simple suite of tools:
 - [get-info](https://github.com/knavesec/Max/blob/dpat/wiki/get-info.md) - Pull lists of information from the Neo4j database
@@ -23,7 +26,9 @@ A new potential attack primitive was added to this tool during my research, see 
 
 ### Installation
 
-Ideally there shouldn't be much to install, it uses pythons standard libraries. You may have to `pip3 install` a library or two if you don't have it. Tested on Kali linux.
+Ideally there shouldn't be much to install, but I've included a requirements.txt file just in case. Tested on Kali linux. 
+
+`pip3 install -r requirements.txt`
 
 ### Neo4j Creds
 

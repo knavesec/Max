@@ -2,6 +2,8 @@
 
 Module for deleting an edge type from the database (warning: irreversible)
 
+[Back to Max](https://github.com/knavesec/Max)
+
 
 #### Notes
 

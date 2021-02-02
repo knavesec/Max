@@ -2,6 +2,8 @@
 
 Adds the SharesPasswordWith relationship to objects in the database. Takes a list of objects, then creates bidirectional edges between all objects, indicating a possible pivot path between the objects. Mostly useful for analysis, this was taken from porterhau5's BloodHound-Owned tool.
 
+[Back to Max](https://github.com/knavesec/Max)
+
 
 #### Notes
 

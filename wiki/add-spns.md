@@ -4,6 +4,8 @@ Adds the HasSPNConfigured relationship to objects in the database. This compromi
 
 Theory, screenshots and usage can be found in the release blog post: [https://whynotsecurity.com/blog/max2/](https://whynotsecurity.com/blog/max2/)
 
+[Back to Max](https://github.com/knavesec/Max)
+
 
 #### Notes
 

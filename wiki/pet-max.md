@@ -4,6 +4,8 @@ Its adorable. That is all.
 
 "Arguably the most important contribution to this project" - me
 
+[Back to Max](https://github.com/knavesec/Max)
+
 
 #### Notes
 
