@@ -535,92 +535,90 @@ def add_spw(args):
     print("[+] SharesPasswordWith relationships created: " + str(count))
 
 
-def dpat_func(args):
+# code from https://github.com/clr2of8/DPAT/blob/master/dpat.py#L64
+def dpat_sanitize(args, pass_or_hash):
+    if not args.sanitize:
+        return pass_or_hash
+    else:
+        sanitized_string = pass_or_hash
+        lenp = len(pass_or_hash)
+        if lenp == 32:
+            sanitized_string = pass_or_hash[0:4] + \
+                "*"*(lenp-8) + pass_or_hash[lenp-5:lenp-1]
+        elif lenp > 2:
+            sanitized_string = pass_or_hash[0] + \
+                "*"*(lenp-2) + pass_or_hash[lenp-1]
+        return sanitized_string
 
-    # code from https://github.com/clr2of8/DPAT/blob/master/dpat.py#L64
-    def sanitize(args, pass_or_hash):
-        if not args.sanitize:
-            return pass_or_hash
+
+def dpat_parse_ntds(lines, ntds_parsed):
+    for line in lines:
+        if ":::" not in line or '$' in line: #filters out other lines in ntds/computer obj
+            continue
+        line = line.replace("\r", "").replace("\n", "")
+        if (line == ""):
+            continue
         else:
-            sanitized_string = pass_or_hash
-            lenp = len(pass_or_hash)
-            if lenp == 32:
-                sanitized_string = pass_or_hash[0:4] + \
-                    "*"*(lenp-8) + pass_or_hash[lenp-5:lenp-1]
-            elif lenp > 2:
-                sanitized_string = pass_or_hash[0] + \
-                    "*"*(lenp-2) + pass_or_hash[lenp-1]
-            return sanitized_string
+            line = line.split(":")
+        # [ username, domain, rid, LM, NT, plaintext||None]
+        to_append = []
+        if (line[0].split("\\")[0] == line[0]):
+            # no domain found, local account
+            to_append.append(line[0])
+            to_append.append("")
+        else:
+            to_append.append(line[0].split("\\")[1])
+            to_append.append(line[0].split("\\")[0])
+        to_append.append(line[1])
+        to_append.append(line[2])
+        to_append.append(line[3])
+        ntds_parsed.append(to_append)
 
-    def parse_ntds(lines, ntds_parsed):
-        for line in lines:
-            if ":::" not in line or '$' in line: #filters out other lines in ntds/computer obj
-                continue
-            line = line.replace("\r", "").replace("\n", "")
-            if (line == ""):
-                continue
-            else:
-                line = line.split(":")
-            # [ username, domain, rid, LM, NT, plaintext||None]
-            to_append = []
-            if (line[0].split("\\")[0] == line[0]):
-                # no domain found, local account
-                to_append.append(line[0])
-                to_append.append("")
-            else:
-                to_append.append(line[0].split("\\")[1])
-                to_append.append(line[0].split("\\")[0])
-            to_append.append(line[1])
-            to_append.append(line[2])
-            to_append.append(line[3])
-            ntds_parsed.append(to_append)
 
-    def map_users(users):
-        count = 0
-        for user in users:
-            try:
-                nt_hash = user[4]
-                lm_hash = user[3]
-                ntds_uname = '/'.join(filter(None, [user[1], user[0]])).replace("\\","\\\\").replace("'","\\'")
-                username = str(user[0].upper().strip() + "@" + user[1].upper().strip()).replace("\\","\\\\").replace("'","\\'")
-                cracked_bool = 'false'
-                password = None
-                password_query = ''
-                if nt_hash in potfile:
-                    cracked_bool = 'true'
-                    password = potfile[nt_hash]
-                elif lm_hash != "aad3b435b51404eeaad3b435b51404ee" and lm_hash in potfile:
-                    cracked_bool = 'true'
-                    password = potfile[lm_hash]
+def dpat_map_users(args, users, potfile):
+    count = 0
+    for user in users:
+        try:
+            nt_hash = user[4]
+            lm_hash = user[3]
+            ntds_uname = '/'.join(filter(None, [user[1], user[0]])).replace("\\","\\\\").replace("'","\\'")
+            username = str(user[0].upper().strip() + "@" + user[1].upper().strip()).replace("\\","\\\\").replace("'","\\'")
+            cracked_bool = 'false'
+            password = None
+            password_query = ''
+            if nt_hash in potfile:
+                cracked_bool = 'true'
+                password = potfile[nt_hash]
+            elif lm_hash != "aad3b435b51404eeaad3b435b51404ee" and lm_hash in potfile:
+                cracked_bool = 'true'
+                password = potfile[lm_hash]
 
-                if password != None:
-                    if "$HEX[" in password:
-                        print("[!] found $HEX[], stripping and unpacking")
-                        password = binascii.unhexlify( str( password.split("[")[1].replace("]", "") ) ).decode("utf-8")
-                    password = password.replace("\\","\\\\").replace("'","\\'")
-                    password_query = "SET u.password='{pwd}'".format(pwd=password)
+            if password != None:
+                if "$HEX[" in password:
+                    print("[!] found $HEX[], stripping and unpacking")
+                    password = binascii.unhexlify( str( password.split("[")[1].replace("]", "") ) ).decode("utf-8")
+                password = password.replace("\\","\\\\").replace("'","\\'")
+                password_query = "SET u.password='{pwd}'".format(pwd=password)
 
-                cracked_query = "SET u.cracked={cracked_bool} SET u.nt_hash='{nt_hash}' SET u.lm_hash='{lm_hash}' SET u.ntds_uname='{ntds_uname}' {password}".format(cracked_bool=cracked_bool,nt_hash=nt_hash,lm_hash=lm_hash,ntds_uname=ntds_uname,password=password_query)
-                query1 = "MATCH (u:User) WHERE u.name='{username}' {cracked_query} RETURN u.name,u.objectid".format(username=username, cracked_query=cracked_query)
-                # print(query1)
-                r1 = do_query(args,query1)
-                bh_users = json.loads(r1.text)['results'][0]['data']
-                if bh_users == []:
-                    # try matching based off username and rid
-                    query2 = "MATCH (u:User) WHERE u.name STARTS WITH '{username}@' AND u.objectid ENDS WITH '-{rid}' {cracked_query} RETURN u.name,u.objectid".format(username=user[0].replace("\\","\\\\").replace("'","\\'").upper(), rid=user[2].upper(), cracked_query=cracked_query)
-                    r2 = do_query(args,query2)
-                    bh_users = json.loads(r2.text)['results'][0]['data']
+            cracked_query = "SET u.cracked={cracked_bool} SET u.nt_hash='{nt_hash}' SET u.lm_hash='{lm_hash}' SET u.ntds_uname='{ntds_uname}' {password}".format(cracked_bool=cracked_bool,nt_hash=nt_hash,lm_hash=lm_hash,ntds_uname=ntds_uname,password=password_query)
+            query1 = "MATCH (u:User) WHERE u.name='{username1}' OR (u.name STARTS WITH '{username2}@' AND u.objectid ENDS WITH '-{rid}') {cracked_query} RETURN u.name,u.objectid".format(username1=username, username2=user[0].replace("\\","\\\\").replace("'","\\'").upper(), rid=user[2].upper(), cracked_query=cracked_query)
+            # print(query1)
+            r1 = do_query(args,query1)
+            bh_users = json.loads(r1.text)['results'][0]['data']
 
-                # if bh_users == [] then the user was not found in BH
-                if bh_users != []:
-                    count = count + 1
+            # if bh_users == [] then the user was not found in BH
+            if bh_users != []:
+                count = count + 1
 
-            except Exception as g:
-                print('{}'.format(g))
-                print(query1)
-                pass
+        except Exception as g:
+            print('{}'.format(g))
+            print(query1)
+            pass
 
-        return count
+    return count
+
+
+def dpat_func(args):
 
     query_counts = {}
 
@@ -656,7 +654,7 @@ def dpat_func(args):
             for t in range(0, num_threads):
                 start = math.ceil((num_lines / num_threads) * t)
                 end = math.ceil((num_lines / num_threads) * (t + 1))
-                p = multiprocessing.Process(target=parse_ntds, args=(ntds[ start : end ], ntds_parsed, ))
+                p = multiprocessing.Process(target=dpat_parse_ntds, args=(ntds[ start : end ], ntds_parsed, ))
                 #print("[*] Starting thread {} with {} to {}".format(t, start, end))
                 p.start()
                 procs.append(p)
@@ -695,13 +693,14 @@ def dpat_func(args):
             print('[+] Mapping NTDS users to BloodHound data')
 
             num_lines = len(ntds_parsed)
+
             # create threads to parse file
             procs = []
             num_threads = int(args.num_threads)
             for t in range(0, num_threads):
                 start = math.ceil((num_lines / num_threads) * t)
                 end = math.ceil((num_lines / num_threads) * (t + 1))
-                p = multiprocessing.Process(target=map_users, args=(ntds_parsed[ start : end ], ))
+                p = multiprocessing.Process(target=dpat_map_users, args=(args, ntds_parsed[ start : end ], potfile, ))
                 #print("[*] Starting thread {} with {} to {}".format(t, start, end))
                 p.start()
                 procs.append(p)
@@ -747,7 +746,7 @@ def dpat_func(args):
         elif resp[0]['row'][1] == None:
             print("[-] User {uname} not cracked, no password found".format(uname=args.usern))
         else:
-            print("[+] Password for user {uname}: {pwd}".format(uname=args.usern,pwd=sanitize(args, resp[0]['row'][1])))
+            print("[+] Password for user {uname}: {pwd}".format(uname=args.usern,pwd=dpat_sanitize(args, resp[0]['row'][1])))
         return
 
     ###
@@ -819,16 +818,20 @@ def dpat_func(args):
 
     intense_queries = [
         {
-            "query" : "MATCH (u:User {cracked:true}),(n {unconstraineddelegation:true}),p=shortestPath((u)-[r*1..]->(n)) WHERE NONE (r IN relationships(p) WHERE type(r)= 'GetChanges') AND NONE (r in relationships(p) WHERE type(r)='GetChangesAll') AND NOT u=n RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
-            "label" : "Accounts With Paths To Unconstrained Delegation Objects Cracked"
+            "query" : "MATCH (g:Group) WHERE g.objectid ENDS WITH '-516' MATCH (c:Computer)-[MemberOf]->(g) WITH COLLECT(c) AS dcs MATCH (u:User {cracked:true}),(n {unconstraineddelegation:true}),p=shortestPath((u)-[r*1..]->(n)) WHERE NOT n IN dcs AND NONE (r IN relationships(p) WHERE type(r)= 'GetChanges') AND NONE (r in relationships(p) WHERE type(r)='GetChangesAll') AND NOT u=n RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash,n.name",
+            "label" : "Accounts With Paths To Unconstrained Delegation Objects Cracked (Excluding DCs)"
         },
         {
             "query" : "MATCH (u:User {cracked:true}),(n {highvalue:true}),p=shortestPath((u)-[r*1..]->(n)) WHERE NONE (r IN relationships(p) WHERE type(r)= 'GetChanges') AND NONE (r in relationships(p) WHERE type(r)='GetChangesAll') AND NOT u=n RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
             "label" : "Accounts With Paths To High Value Targets Cracked"
         },
         {
-            "query" : "MATCH p1=(u1:User {cracked:true})-[r:AdminTo]->(n1),p2=(u2:User {cracked:true})-[r1:MemberOf*1..]->(g:Group)-[r2:AdminTo]->(n2) WITH COLLECT(u1)+COLLECT(u2) AS users UNWIND users AS u RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
-            "label" : "Accounts With Local Admin Rights Cracked"
+            "query" : "MATCH p1=(u:User {cracked:true})-[r:AdminTo]->(n1) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
+            "label" : "Accounts With Explicit Admin Rights Cracked"
+        },
+        {
+            "query" : "MATCH p2=(u:User {cracked:true})-[r1:MemberOf*1..]->(g:Group)-[r2:AdmintTo]->(n2) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
+            "label" : "Accounts With Group Delegated Admin Rights Cracked"
         },
         {
             "query" : "MATCH p1=(u:User {cracked:true})-[r:AllExtendedRights|AddMember|ForceChangePassword|GenericAll|GenericWrite|Owns|WriteDacl|WriteOwner|ReadLAPSPassword|ReadGMSAPassword|CanRDP|CanPSRemote|ExecuteDCOM|AllowedToDelegate|AddAllowedToAct|AllowedToAct|SQLAdmin|HasSIDHistory]->(n1) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
@@ -867,8 +870,10 @@ def dpat_func(args):
             hashes[entry['row'][0]] = [entry['row'][1]]
         else:
             hashes[entry['row'][0]].append(entry['row'][1])
-
+    import time
     for search_value in queries:
+
+        # start = time.time()
 
         query = search_value['query']
         label = search_value['label']
@@ -881,6 +886,8 @@ def dpat_func(args):
 
         r = do_query(args,query)
         resp = json.loads(r.text)['results'][0]['data']
+        # end = time.time()
+        # print("[*] Done in {} seconds".format(end-start))
         for entry in resp:
             query_counts[label] += 1 # TODO
             status_flag = "disabled"
@@ -1007,7 +1014,7 @@ def dpat_func(args):
 
     lm_hash_list = []
     for entry in resp:
-        user = [entry['row'][0], sanitize(args, entry['row'][1])]
+        user = [entry['row'][0], dpat_sanitize(args, entry['row'][1])]
         user.append(lm_hash_counts[entry['row'][1]])
         lm_hash_list.append(user)
     lm_hash_list = sorted(lm_hash_list, key = lambda x: x[2], reverse=True)
@@ -1018,7 +1025,7 @@ def dpat_func(args):
     resp = json.loads(r.text)['results'][0]['data']
     user_pass_match_list = []
     for entry in resp:
-        user_pass_match_list.append([entry['row'][0],sanitize(args,entry['row'][1]),len(entry['row'][1]),entry['row'][2]])
+        user_pass_match_list.append([entry['row'][0],dpat_sanitize(args,entry['row'][1]),len(entry['row'][1]),entry['row'][2]])
     user_pass_match = len(user_pass_match_list)
 
     # Get Password Length Stats
@@ -1183,7 +1190,7 @@ def dpat_func(args):
                         if column is not None:
                             col_data = column
                             if ((("Password") in headers[col_num] and not "Password Length" in headers[col_num]) or ("Hash" in headers[col_num] and not "Users Sharing this Hash" in headers[col_num]) or ("History" in headers[col_num])):
-                                col_data = sanitize(args, column)
+                                col_data = dpat_sanitize(args, column)
                             if col_num != col_to_not_escape:
                                 col_data = htmllib.escape(str(col_data))
                             html += "<td>" + col_data + "</td>"
@@ -1264,36 +1271,36 @@ def dpat_func(args):
 
         print("")
         print("")
-        print("{:^82}".format("Overall Statistics"))
-        print(" " + "="*86)
-        print("|{:^10}|{:^75}|".format("Count", "Description"))
-        print(" " + "="*86)
+        print("{:^92}".format("Overall Statistics"))
+        print(" " + "="*96)
+        print("|{:^10}|{:^85}|".format("Count", "Description"))
+        print(" " + "="*96)
 
         for set in stats:
-             print("|{:^10}|{:^75}|".format(set[0], set[1]))
+             print("|{:^10}|{:^85}|".format(set[0], set[1]))
 
         for item in query_output_data:
-            print("|{:^10}|{:^75}|".format(len(item['enabled']) + len(item['disabled']),item['label']))
+            print("|{:^10}|{:^85}|".format(len(item['enabled']) + len(item['disabled']),item['label']))
 
-        print(" " + "="*86)
+        print(" " + "="*96)
         print("")
         print("")
-        print("{:^82}".format("Password Length Stats"))
-        print(" " + "="*86)
-        print("|{:^10}|{:^75}|".format("Count", "Description"))
-        print(" " + "="*86)
+        print("{:^92}".format("Password Length Stats"))
+        print(" " + "="*96)
+        print("|{:^10}|{:^85}|".format("Count", "Description"))
+        print(" " + "="*96)
         for pw_len in password_lengths:
-            print("|{:^10}|{:^75}|".format(pw_len[0], "{} Characters".format(pw_len[1])))
-        print(" " + "="*86)
+            print("|{:^10}|{:^85}|".format(pw_len[0], "{} Characters".format(pw_len[1])))
+        print(" " + "="*96)
         print("")
         print("")
-        print("{:^82}".format("Password Reuse Stats (Top 10%)"))
-        print(" " + "="*86)
-        print("|{:^10}|{:^75}|".format("Count", "Description"))
-        print(" " + "="*86)
+        print("{:^92}".format("Password Reuse Stats (Top 10%)"))
+        print(" " + "="*96)
+        print("|{:^10}|{:^85}|".format("Count", "Description"))
+        print(" " + "="*96)
         for i in range(0,min(num_repeated_passwords, math.ceil( tot_num_repeated_passwords * 0.10 ))): # cap at 50 reused passwords
-            print("|{:^10}|{:^75}|".format(repeated_passwords[i][0], sanitize(args, repeated_passwords[i][1])))
-        print(" " + "="*86)
+            print("|{:^10}|{:^85}|".format(repeated_passwords[i][0], dpat_sanitize(args, repeated_passwords[i][1])))
+        print(" " + "="*96)
         print("")
         print("")
 
