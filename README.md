@@ -27,7 +27,7 @@ A new potential attack primitive was added to this tool during my research, see 
 
 ### Installation
 
-Ideally there shouldn't be much to install, but I've included a requirements.txt file just in case. Tested on Kali linux.
+Ideally there shouldn't be much to install, but I've included a requirements.txt file just in case. Tested on Kali Linux & Windows 10, all functionality should work for both linux and Windows operating systems.
 
 `pip3 install -r requirements.txt`
 

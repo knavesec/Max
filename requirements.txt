@@ -1,5 +1,1 @@
 requests
-argparse
-numpy
-multiprocessing
-html

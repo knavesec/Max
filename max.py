@@ -2,16 +2,13 @@
 
 import requests
 from requests.auth import HTTPBasicAuth
-import sys
 import argparse
 import json
 import random
-import re
 import csv
 import binascii
 import math
 import os
-import numpy
 import multiprocessing
 import webbrowser
 from distutils.util import strtobool
@@ -19,7 +16,7 @@ try:
     import html as htmllib
 except ImportError:
     import cgi as htmllib
-from itertools import takewhile, repeat, zip_longest
+from itertools import zip_longest
 
 
 # option to hardcode URL & URI
