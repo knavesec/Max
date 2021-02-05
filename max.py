@@ -1067,7 +1067,7 @@ def dpat_func(args):
             password_complexity.append([entry['row'][1],entry['row'][0],True])
         else:
             password_complexity.append([entry['row'][1],entry['row'][0],False])
-    password_complexity = sorted(password_complexity, key = lambda x: x[2], reverse=True)
+    password_complexity = sorted(password_complexity, key = lambda x: x[2])
 
     # all stats
     stats = [
