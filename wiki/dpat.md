@@ -77,7 +77,7 @@ The DPAT tool also supports output from John the Ripper (same format as hashcat.
 #### Examples
 
 ```
-python3 max.py dpat -p ~/.hashcat/hashcat.potfile -n ./ntds.dit --sanitize
+python3 max.py dpat -c ~/.hashcat/hashcat.potfile -n ./ntds.dit --sanitize
 
 <Function output>
 <Ascii password analysis output>
