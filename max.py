@@ -188,8 +188,8 @@ def get_info(args):
         query = queries["nopreauth"]["query"]
         cols = queries["nopreauth"]["columns"]
     elif (args.kerberoastable):
-        query = queries["kerberoastableLA"]["query"]
-        cols = queries["kerberoastableLA"]["columns"]
+        query = queries["kerberoastable"]["query"]
+        cols = queries["kerberoastable"]["columns"]
     elif (args.kerberoastableLA):
         query = queries["kerberoastableLA"]["query"]
         cols = queries["kerberoastableLA"]["columns"]
