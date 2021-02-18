@@ -25,7 +25,7 @@ global_uri = "/db/data/transaction/commit"
 
 # option to hardcode creds, these will be used as the username and password "defaults"
 global_username = "neo4j"
-global_password = "password"
+global_password = "bloodhound"
 
 
 def do_test(args):
@@ -41,8 +41,6 @@ def do_query(args, query):
 
     data = {"statements":[{"statement":query}]}
     headers = {'Content-type': 'application/json', 'Accept': 'application/json; charset=UTF-8'}
-    if args.password == "":
-        args.password == input("Password:")
     auth = HTTPBasicAuth(args.username, args.password)
 
     r = requests.post(args.url + global_uri, auth=auth, headers=headers, json=data)
