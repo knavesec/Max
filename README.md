@@ -33,9 +33,17 @@ Ideally there shouldn't be much to install, but I've included a requirements.txt
 
 ### Neo4j Creds
 
-Neo4j credentials can be hardcoded at the beginning of the script *OR* they can be provided as CLI
+Neo4j credentials can be hardcoded at the beginning of the script *OR* they can be provided as CLI. If both areas are left blank, you will be prompted for the uname/password.
 
-`python3 max.py -u neo4j -p neo4j {module} {args}`
+```
+python3 max.py -u neo4j -p neo4j {module} {args}
+```
+
+```
+python3 max.py {module} {args}
+Neo4j Username: neo4j
+Neo4j Password: 
+```
 
 ### Quick Use
 

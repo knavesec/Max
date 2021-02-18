@@ -11,6 +11,7 @@ import math
 import os
 import multiprocessing
 import webbrowser
+import getpass
 from distutils.util import strtobool
 try:
     import html as htmllib
@@ -36,9 +37,16 @@ def do_test(args):
         return False
 
 
-def do_query(args, query):
+def do_query(args, query, data_format):
 
-    data = {"statements":[{"statement":query}]}
+    data = {
+        "statements" : [
+            {
+                "statement" : query,
+                "resultDataContents" : [ data_format ]
+            }
+        ]
+    }
     headers = {'Content-type': 'application/json', 'Accept': 'application/json; charset=UTF-8'}
     auth = HTTPBasicAuth(args.username, args.password)
 
@@ -159,10 +167,23 @@ def get_info(args):
             "query" : "MATCH shortestPath((n {owned:True})-[*1..]->(m {highvalue:True})) RETURN DISTINCT n.name",
             "columns" : ["UserName"]
         },
+        "path" : {
+            "query" : "MATCH p=shortestPath((n1 {{name:'{start}'}})-[rels*1..]->(n2 {{name:'{end}'}})) RETURN p",
+            "columns" : ["Path"]
+        },
+        "hvtpaths" : {
+            "query" : "MATCH p=allShortestPaths((n1 {{name:'{start}'}})-[rels*1..]->(n2 {{highvalue:true}})) RETURN p",
+            "columns" : ["Path"]
+        },
+        "ownedpaths" : {
+            "query" : "MATCH p=allShortestPaths((n1 {owned:true})-[rels*1..]->(n2 {highvalue:true})) RETURN p",
+            "columns" : ["Path"]
+        }
     }
 
     query = ""
     cols = []
+    data_format = "row"
     if (args.users):
         query = queries["users"]["query"]
         cols = queries["users"]["columns"]
@@ -241,6 +262,21 @@ def get_info(args):
     elif (args.groupmems != ""):
         query = queries["group-members"]["query"].format(gname=args.groupmems.upper().strip())
         cols = queries["group-members"]["columns"]
+    elif (args.path != ""):
+        start = args.path.split(',')[0].strip().upper()
+        end = args.path.split(',')[1].strip().upper()
+        query = queries["path"]["query"].format(start=start,end=end)
+        cols = queries["path"]["columns"]
+        data_format = "graph"
+    elif (args.hvtpaths != ""):
+        start = args.hvtpaths.split(',')[0].strip().upper()
+        query = queries["hvtpaths"]["query"].format(start=start)
+        cols = queries["hvtpaths"]["columns"]
+        data_format = "graph"
+    elif (args.ownedpaths != ""):
+        query = queries["ownedpaths"]["query"]
+        cols = queries["ownedpaths"]["columns"]
+        data_format = "graph"
 
     if args.getnote:
         query = query + ",n.notes"
@@ -253,21 +289,55 @@ def get_info(args):
     else:
         pass
 
-    r = do_query(args, query)
+    r = do_query(args, query, data_format)
     x = json.loads(r.text)
     # print(r.text)
     entry_list = x["results"][0]["data"]
+    # print(entry_list)
 
-    if args.label:
-        print(" - ".join(cols))
-    for value in entry_list:
-        try:
-            print(" - ".join(value["row"]))
-        except:
-            if len(cols) == 1:
-                pass
-            else:
-                print(" - ".join(map(str,value["row"])))
+    if cols[0] == "Path":
+        for entry in entry_list:
+            try:
+                nodes = entry['graph']['nodes']
+                edges = entry['graph']['relationships']
+                node_end_list = []
+                node_dict = {}
+                edge_dict = {}
+
+                for node in nodes:
+                    node_dict[node['id']] = node['properties']['name']
+
+                for edge in edges:
+                    edge_dict[node_dict[edge['startNode']]] = ["-", edge['type'], "->", node_dict[edge['endNode']]]
+                    node_end_list.append(node_dict[edge['endNode']])
+
+                for key in edge_dict.keys():
+                    if key not in node_end_list:
+                        first_node = key
+
+                path = [first_node]
+                key = first_node
+                while key in edge_dict:
+
+                    for item in edge_dict[key]:
+                        path.append(item)
+                    key = path[len(path)-1]
+
+                print(" ".join(path))
+            except:
+                print("Path not found :(")
+
+    else:
+        if args.label:
+            print(" - ".join(cols))
+        for value in entry_list:
+            try:
+                print(" - ".join(value["row"]))
+            except:
+                if len(cols) == 1:
+                    pass
+                else:
+                    print(" - ".join(map(str,value["row"])))
 
 
 def mark_owned(args):
@@ -1395,10 +1465,13 @@ def main():
     getinfo_switch.add_argument("--adminsof",dest="comp",default="",help="Return a list of users that are administrators to COMP.DOMAIN.LOCAL")
     getinfo_switch.add_argument("--owned",dest="owned",default=False,action="store_true",help="Return all objects that are marked as owned")
     getinfo_switch.add_argument("--owned-groups",dest="ownedgroups",default=False,action="store_true",help="Return groups of all owned objects")
+    getinfo_switch.add_argument("--owned-to-hvts",dest="ownedtohvts",default=False,action="store_true",help="Return all owned objects with paths to High Value Targets")
     getinfo_switch.add_argument("--hvt",dest="hvt",default=False,action="store_true",help="Return all objects that are marked as High Value Targets")
     getinfo_switch.add_argument("--desc",dest="desc",default=False,action="store_true",help="Return all objects with the description field populated, also returns description for easy grepping")
     getinfo_switch.add_argument("--admincomps",dest="admincomps",default=False,action="store_true",help="Return all computers with admin privileges to another computer [Comp1-AdminTo->Comp2]")
-    getinfo_switch.add_argument("--owned-to-hvts",dest="ownedtohvts",default=False,action="store_true",help="Return all owned objects with paths to High Value Targets")
+    getinfo_switch.add_argument("--path",dest="path",default="",help="Return the shortest path between two comma separated input nodes \"NODE1@DOMAIN.LOCAL, NODE 2@DOMAIN.LOCAL\" ")
+    getinfo_switch.add_argument("--hvt-paths",dest="hvtpaths",default="",help="Return all paths from the input node to HVTs")
+    getinfo_switch.add_argument("--owned-paths",dest="ownedpaths",default=False,action="store_true",help="Return all paths from owned objects to HVTs")
 
     getinfo.add_argument("--get-note",dest="getnote",default=False,action="store_true",help="Optional, return the \"notes\" attribute for whatever objects are returned")
     getinfo.add_argument("-l",dest="label",action="store_true",default=False,help="Optional, apply labels to the columns returned")
@@ -1455,6 +1528,15 @@ def main():
         print("Connection error: restart Neo4j console or verify the the following URL is available: {}".format(args.url))
         exit()
 
+    if args.command == None:
+        print("Error: use a module or use -h/--help to see help")
+        return
+
+    if args.username == "":
+        args.username = input("Neo4j Username: ")
+    if args.password == "":
+        args.password = getpass.getpass(prompt="Neo4j Password: ")
+
     if args.command == "get-info":
         get_info(args)
     elif args.command == "mark-owned":
@@ -1481,8 +1563,8 @@ def main():
         dpat_func(args)
     elif args.command == "pet-max":
         pet_max()
-    else:
-        print("Error: use a module or use -h/--help to see help")
+    # else:
+    #     print("Error: use a module or use -h/--help to see help")
 
 
 if __name__ == "__main__":

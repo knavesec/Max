@@ -14,7 +14,7 @@ There are a few things you can extract with this module:
 
 #### Notes
 
-* `users`, `comps`, `groups`, `das`, `dasessions`, `nolaps`, `unconst`, `npusers`, `kerb`, `kerb-la`, `passnotreq`, `owned`, `hvt`  all return simple lists and take no inputs
+* `users`, `comps`, `groups`, `das`, `dasessions`, `nolaps`, `unconst`, `npusers`, `kerb`, `kerb-la`, `passnotreq`, `owned`, `hvt`, and `owned-to-hvts`  all return simple lists and take no inputs
 * `groups-full` returns all domain groups with their respective members in the format `group@domain.local - member_node_name`
 * `group-members` returns all AD objects that are members of the input `GROUP`
 * `owned-groups` returns a list of owned objects with a list of all groups they are a member of, nice for grepping and targeting
@@ -29,7 +29,9 @@ There are a few things you can extract with this module:
 * `get-note` returns the notes of each object, typically used with the `add-note` function in the `mark-*` modules
 * `-l` apply column labels as a header. All queries with `get-info` do not return column headers (like "UserName","ComputerName","Description",etc) by default with the query
 * `-e/--enabled` returns only the enabled users from the applicable query (only working for `--users` and `--passnotreq`)
-* `owned-to-hvts` Return all owned objects with paths to High Value Targets.
+* `path` will return the full path between two input nodes
+* `hvt-paths` will return all paths to HVTs originating from an input node
+* `owned-paths` will return all paths to HVTs originating from an input node
 
 #### Examples
 
@@ -70,4 +72,20 @@ python3 max.py get-info --desc
 USER1@DOMAIN.LOCAL - This user is super cool
 USER3@DOMAIN2.LOCAL - This user's password is Password1!
 ...
+```
+
+```
+python3 max.py get-info --path "DOMAIN USERS@DOMAIN.LOCAL, DOMAIN ADMINS@DOMAIN.LOCAL"
+
+DOMAIN USERS@DOMAIN.LOCAL - EdgeName -> Node2 .... -> DOMAIN ADMINS@DOMAIN.LOCAL
+```
+
+```
+python3 max.py get-info --hvt-paths "ADMINISTRATOR@JRENET.COM"
+
+ADMINISTRATOR@DOMAIN.LOCAL - MemberOf -> ENTERPRISE ADMINS@DOMAIN.LOCAL - GenericAll -> DOMAIN.LOCAL
+ADMINISTRATOR@DOMAIN.LOCAL - MemberOf -> ADMINISTRATORS@DOMAIN.LOCAL - WriteDacl -> DOMAIN.LOCAL
+ADMINISTRATOR@DOMAIN.LOCAL - MemberOf -> ADMINISTRATORS@DOMAIN.LOCAL - AllExtendedRights -> DOMAIN.LOCAL
+ADMINISTRATOR@DOMAIN.LOCAL - MemberOf -> ADMINISTRATORS@DOMAIN.LOCAL - WriteOwner -> DOMAIN.LOCAL
+
 ```
