@@ -25,7 +25,7 @@ global_uri = "/db/data/transaction/commit"
 
 # option to hardcode creds, these will be used as the username and password "defaults"
 global_username = "neo4j"
-global_password = "bloodhound"
+global_password = "password"
 
 
 def do_test(args):
@@ -41,6 +41,8 @@ def do_query(args, query):
 
     data = {"statements":[{"statement":query}]}
     headers = {'Content-type': 'application/json', 'Accept': 'application/json; charset=UTF-8'}
+    if args.password == "":
+        args.password == input("Password:")
     auth = HTTPBasicAuth(args.username, args.password)
 
     r = requests.post(args.url + global_uri, auth=auth, headers=headers, json=data)
@@ -155,7 +157,11 @@ def get_info(args):
         "foreignprivs" : {
             "query" : "MATCH p=(n1)-[r]->(n2) WHERE NOT n1.domain=n2.domain RETURN DISTINCT n1.name,TYPE(r),n2.name ORDER BY TYPE(r)",
             "columns" : ["ObjectName","EdgeName","VictimObjectName"]
-        }
+        },
+        "owned-to-hvts" : {
+            "query" : "MATCH (n {owned:True}) MATCH (m) WHERE m.highvalue = True WITH m, COUNT(n) as userCount MATCH p = shortestPath((n {owned:True})-[*1..]->(m)) RETURN n.name",
+            "columns" : ["UserName"]
+        },
     }
 
     query = ""
@@ -223,6 +229,9 @@ def get_info(args):
     elif (args.foreignprivs):
         query = queries["foreignprivs"]["query"]
         cols = queries["foreignprivs"]["columns"]
+    elif (args.ownedtohvts):
+        query = queries["owned-to-hvts"]["query"]
+        cols = queries["owned-to-hvts"]["query"]
     elif (args.unamesess != ""):
         query = queries["sessions"]["query"].format(uname=args.unamesess.upper().strip())
         cols = queries["sessions"]["columns"]
@@ -1392,6 +1401,7 @@ def main():
     getinfo_switch.add_argument("--hvt",dest="hvt",default=False,action="store_true",help="Return all objects that are marked as High Value Targets")
     getinfo_switch.add_argument("--desc",dest="desc",default=False,action="store_true",help="Return all objects with the description field populated, also returns description for easy grepping")
     getinfo_switch.add_argument("--admincomps",dest="admincomps",default=False,action="store_true",help="Return all computers with admin privileges to another computer [Comp1-AdminTo->Comp2]")
+    getinfo_switch.add_argument("--owned-to-hvts",dest="ownedtohvts",default=False,action="store_true",help="Return all owned objects with paths to High Value Targets")
 
     getinfo.add_argument("--get-note",dest="getnote",default=False,action="store_true",help="Optional, return the \"notes\" attribute for whatever objects are returned")
     getinfo.add_argument("-l",dest="label",action="store_true",default=False,help="Optional, apply labels to the columns returned")
