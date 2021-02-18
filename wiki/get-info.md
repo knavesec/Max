@@ -29,7 +29,7 @@ There are a few things you can extract with this module:
 * `get-note` returns the notes of each object, typically used with the `add-note` function in the `mark-*` modules
 * `-l` apply column labels as a header. All queries with `get-info` do not return column headers (like "UserName","ComputerName","Description",etc) by default with the query
 * `-e/--enabled` returns only the enabled users from the applicable query (only working for `--users` and `--passnotreq`)
-* `path` will return the full path between two input nodes
+* `path` will return the full shortest path between two input nodes, `paths-all` will return all the shortest paths
 * `hvt-paths` will return all paths to HVTs originating from an input node
 * `owned-paths` will return all paths to HVTs originating from an input node
 

@@ -25,8 +25,8 @@ global_url = "http://127.0.0.1:7474"
 global_uri = "/db/data/transaction/commit"
 
 # option to hardcode creds, these will be used as the username and password "defaults"
-global_username = "neo4j"
-global_password = "bloodhound"
+global_username = ""
+global_password = ""
 
 def do_test(args):
 
@@ -171,6 +171,10 @@ def get_info(args):
             "query" : "MATCH p=shortestPath((n1 {{name:'{start}'}})-[rels*1..]->(n2 {{name:'{end}'}})) RETURN p",
             "columns" : ["Path"]
         },
+        "paths-all" : {
+            "query" : "MATCH p=allShortestPaths((n1 {{name:'{start}'}})-[rels*1..]->(n2 {{name:'{end}'}})) RETURN p",
+            "columns" : ["Path"]
+        },
         "hvtpaths" : {
             "query" : "MATCH p=allShortestPaths((n1 {{name:'{start}'}})-[rels*1..]->(n2 {{highvalue:true}})) RETURN p",
             "columns" : ["Path"]
@@ -267,6 +271,12 @@ def get_info(args):
         end = args.path.split(',')[1].strip().upper()
         query = queries["path"]["query"].format(start=start,end=end)
         cols = queries["path"]["columns"]
+        data_format = "graph"
+    elif (args.pathsall != ""):
+        start = args.pathsall.split(',')[0].strip().upper()
+        end = args.pathsall.split(',')[1].strip().upper()
+        query = queries["paths-all"]["query"].format(start=start,end=end)
+        cols = queries["paths-all"]["columns"]
         data_format = "graph"
     elif (args.hvtpaths != ""):
         start = args.hvtpaths.split(',')[0].strip().upper()
@@ -1470,6 +1480,7 @@ def main():
     getinfo_switch.add_argument("--desc",dest="desc",default=False,action="store_true",help="Return all objects with the description field populated, also returns description for easy grepping")
     getinfo_switch.add_argument("--admincomps",dest="admincomps",default=False,action="store_true",help="Return all computers with admin privileges to another computer [Comp1-AdminTo->Comp2]")
     getinfo_switch.add_argument("--path",dest="path",default="",help="Return the shortest path between two comma separated input nodes \"NODE1@DOMAIN.LOCAL, NODE 2@DOMAIN.LOCAL\" ")
+    getinfo_switch.add_argument("--paths-all",dest="pathsall",default="",help="Return all paths between two comma separated input nodes \"NODE1@DOMAIN.LOCAL, NODE 2@DOMAIN.LOCAL\" ")
     getinfo_switch.add_argument("--hvt-paths",dest="hvtpaths",default="",help="Return all paths from the input node to HVTs")
     getinfo_switch.add_argument("--owned-paths",dest="ownedpaths",default=False,action="store_true",help="Return all paths from owned objects to HVTs")
 
