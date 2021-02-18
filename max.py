@@ -27,7 +27,6 @@ global_uri = "/db/data/transaction/commit"
 global_username = "neo4j"
 global_password = "bloodhound"
 
-
 def do_test(args):
 
     try:
@@ -157,7 +156,7 @@ def get_info(args):
             "columns" : ["ObjectName","EdgeName","VictimObjectName"]
         },
         "owned-to-hvts" : {
-            "query" : "MATCH (n {owned:True}) MATCH (m) WHERE m.highvalue = True WITH m, COUNT(n) as userCount MATCH p = shortestPath((n {owned:True})-[*1..]->(m)) RETURN n.name",
+            "query" : "MATCH shortestPath((n {owned:True})-[*1..]->(m {highvalue:True})) RETURN DISTINCT n.name",
             "columns" : ["UserName"]
         },
     }
