@@ -9,6 +9,7 @@ For the advanced BloodHound user, experience with Cypher queries required. Allow
 
 * Invalid syntax will return a syntax error and Neo4j debugging instructions  
 * Must return node attributes like: `n.name`, `n.description`, `n.owned`, etc (there are many more)
+* `path` flag indicates the output is a full path
 * Unlike other modules, the notes in "Object Files & Specification" do not all apply, any object name must include FQDN but also must be capitalized, just like any query run in the browser
 * Main benefit is not having to copy-paste out of the Neo4j browser console
 
@@ -23,4 +24,9 @@ python3 max.py query "match (u:User)-[r*1..]->(g:Group) where g.objectid ends wi
 Return amount of computers each user is admin to
 ```
 python3 max.py query "match (u:User)-[r:MemberOf|AdminTo*1..]->(c:Computer) return u.name,count(c.name) order by count(c.name) desc"
+```
+
+Return the path from Domain Users to Domain Admins
+```
+python3 max.py query "match p=allShortestPaths((g1:Group {name:'DOMAIN USERS@DOMAIN.LOCAL'})-[*1..]->(g2:Group {name:'DOMAIN ADMINS@DOMAIN.LOCAL'})) return p" --path
 ```

@@ -25,8 +25,8 @@ global_url = "http://127.0.0.1:7474"
 global_uri = "/db/data/transaction/commit"
 
 # option to hardcode creds, these will be used as the username and password "defaults"
-global_username = ""
-global_password = ""
+global_username = "neo4j"
+global_password = "bloodhound"
 
 def do_test(args):
 
@@ -37,8 +37,9 @@ def do_test(args):
         return False
 
 
-def do_query(args, query, data_format):
+def do_query(args, query, data_format=None):
 
+    data_format = [data_format, "row"][data_format == None]
     data = {
         "statements" : [
             {
@@ -57,6 +58,48 @@ def do_query(args, query, data_format):
         exit()
     else:
         return r
+
+
+def get_query_output(entry,cols_len=None,path=False):
+
+    if path:
+        try:
+            nodes = entry['graph']['nodes']
+            edges = entry['graph']['relationships']
+            node_end_list = []
+            node_dict = {}
+            edge_dict = {}
+
+            for node in nodes:
+                node_dict[node['id']] = node['properties']['name']
+
+            for edge in edges:
+                edge_dict[node_dict[edge['startNode']]] = ["-", edge['type'], "->", node_dict[edge['endNode']]]
+                node_end_list.append(node_dict[edge['endNode']])
+
+            for key in edge_dict.keys():
+                if key not in node_end_list:
+                    first_node = key
+
+            path = [first_node]
+            key = first_node
+            while key in edge_dict:
+
+                for item in edge_dict[key]:
+                    path.append(item)
+                key = path[len(path)-1]
+
+            return " ".join(path)
+        except:
+            return "Path not found :("
+    else:
+        try:
+            return " - ".join(entry["row"])
+        except:
+            if cols_len == 1:
+                pass
+            else:
+                return " - ".join(map(str,entry["row"]))
 
 
 def get_info(args):
@@ -299,7 +342,7 @@ def get_info(args):
     else:
         pass
 
-    r = do_query(args, query, data_format)
+    r = do_query(args, query, data_format=data_format)
     x = json.loads(r.text)
     # print(r.text)
     entry_list = x["results"][0]["data"]
@@ -307,47 +350,13 @@ def get_info(args):
 
     if cols[0] == "Path":
         for entry in entry_list:
-            try:
-                nodes = entry['graph']['nodes']
-                edges = entry['graph']['relationships']
-                node_end_list = []
-                node_dict = {}
-                edge_dict = {}
-
-                for node in nodes:
-                    node_dict[node['id']] = node['properties']['name']
-
-                for edge in edges:
-                    edge_dict[node_dict[edge['startNode']]] = ["-", edge['type'], "->", node_dict[edge['endNode']]]
-                    node_end_list.append(node_dict[edge['endNode']])
-
-                for key in edge_dict.keys():
-                    if key not in node_end_list:
-                        first_node = key
-
-                path = [first_node]
-                key = first_node
-                while key in edge_dict:
-
-                    for item in edge_dict[key]:
-                        path.append(item)
-                    key = path[len(path)-1]
-
-                print(" ".join(path))
-            except:
-                print("Path not found :(")
+            print(get_query_output(entry,path=True))
 
     else:
         if args.label:
             print(" - ".join(cols))
-        for value in entry_list:
-            try:
-                print(" - ".join(value["row"]))
-            except:
-                if len(cols) == 1:
-                    pass
-                else:
-                    print(" - ".join(map(str,value["row"])))
+        for entry in entry_list:
+            print(get_query_output(entry,cols_len=len(cols)))
 
 
 def mark_owned(args):
@@ -408,20 +417,21 @@ def mark_hvt(args):
 
 def query_func(args):
 
-    r = do_query(args, args.QUERY)
+    data_format = ["row", "graph"][args.path]
+
+    r = do_query(args, args.QUERY, data_format=data_format)
     x = json.loads(r.text)
 
     try:
         entry_list = x["results"][0]["data"]
+        cols_len = 0
 
-        for value in entry_list:
-            try:
-                print(" - ".join(value["row"]))
-            except:
-                if len(value["row"]) == 1:
-                    pass
-                else:
-                    print(" - ".join(map(str,value["row"])))
+        for entry in entry_list:
+            if not args.path:
+                cols_len = len(entry['row'])
+            output = get_query_output(entry, cols_len=cols_len, path=args.path)
+            if output != None:
+                print(output)
 
     except:
         if x['errors'][0]['code'] == "Neo.ClientError.Statement.SyntaxError":
@@ -685,7 +695,7 @@ def dpat_map_users(args, users, potfile):
 
             cracked_query = "SET u.cracked={cracked_bool} SET u.nt_hash='{nt_hash}' SET u.lm_hash='{lm_hash}' SET u.ntds_uname='{ntds_uname}' {password}".format(cracked_bool=cracked_bool,nt_hash=nt_hash,lm_hash=lm_hash,ntds_uname=ntds_uname,password=password_query)
             query1 = "MATCH (u:User) WHERE u.name='{username1}' OR (u.name STARTS WITH '{username2}@' AND u.objectid ENDS WITH '-{rid}') {cracked_query} RETURN u.name,u.objectid".format(username1=username, username2=user[0].replace("\\","\\\\").replace("'","\\'").upper(), rid=user[2].upper(), cracked_query=cracked_query)
-            # print(query1)
+
             r1 = do_query(args,query1)
             bh_users = json.loads(r1.text)['results'][0]['data']
 
@@ -694,8 +704,8 @@ def dpat_map_users(args, users, potfile):
                 count = count + 1
 
         except Exception as g:
-            print('{}'.format(g))
-            print(query1)
+            # print('{}'.format(g))
+            # print(query1)
             pass
 
     return count
@@ -1499,7 +1509,8 @@ def main():
     markhvt.add_argument("--clear",dest="clear",action="store_true",help="Remove HVT marker from all objects")
 
     # QUERY function arguments
-    query.add_argument("QUERY",help="Query designation")
+    query.add_argument("QUERY", help="Query designation")
+    query.add_argument("--path",dest="path", default=False, required=False, action="store_true", help="Flag to indicate output is a path")
 
     # EXPORT function parameters
     export.add_argument("NODENAME",help="Full name of node to extract info about (UNAME@DOMAIN/COMP.DOMAIN)")
