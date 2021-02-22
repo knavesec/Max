@@ -10,6 +10,7 @@ For the advanced BloodHound user, experience with Cypher queries required. Allow
 * Invalid syntax will return a syntax error and Neo4j debugging instructions  
 * Must return node attributes like: `n.name`, `n.description`, `n.owned`, etc (there are many more)
 * `path` flag indicates the output is a full path
+* `d/delim` Is a flag where a new output delimeter can be set to separate outputs. Default is `output1 - output2` with the "-" being the changable delimeter. Doesn't apply to path outputs
 * Unlike other modules, the notes in "Object Files & Specification" do not all apply, any object name must include FQDN but also must be capitalized, just like any query run in the browser
 * Main benefit is not having to copy-paste out of the Neo4j browser console
 

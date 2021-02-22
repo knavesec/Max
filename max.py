@@ -60,7 +60,7 @@ def do_query(args, query, data_format=None):
         return r
 
 
-def get_query_output(entry,cols_len=None,path=False):
+def get_query_output(entry,delimeter,cols_len=None,path=False):
 
     if path:
         try:
@@ -94,12 +94,12 @@ def get_query_output(entry,cols_len=None,path=False):
             return "Path not found :("
     else:
         try:
-            return " - ".join(entry["row"])
+            return " {} ".format(delimeter).join(entry["row"])
         except:
             if cols_len == 1:
                 pass
             else:
-                return " - ".join(map(str,entry["row"]))
+                return " {} ".format(delimeter).join(map(str,entry["row"]))
 
 
 def get_info(args):
@@ -350,13 +350,13 @@ def get_info(args):
 
     if cols[0] == "Path":
         for entry in entry_list:
-            print(get_query_output(entry,path=True))
+            print(get_query_output(entry,args.delimeter,path=True))
 
     else:
         if args.label:
             print(" - ".join(cols))
         for entry in entry_list:
-            print(get_query_output(entry,cols_len=len(cols)))
+            print(get_query_output(entry,args.delimeter,cols_len=len(cols)))
 
 
 def mark_owned(args):
@@ -429,7 +429,7 @@ def query_func(args):
         for entry in entry_list:
             if not args.path:
                 cols_len = len(entry['row'])
-            output = get_query_output(entry, cols_len=cols_len, path=args.path)
+            output = get_query_output(entry, args.delimeter, cols_len=cols_len, path=args.path)
             if output != None:
                 print(output)
 
@@ -1497,6 +1497,7 @@ def main():
     getinfo.add_argument("--get-note",dest="getnote",default=False,action="store_true",help="Optional, return the \"notes\" attribute for whatever objects are returned")
     getinfo.add_argument("-l",dest="label",action="store_true",default=False,help="Optional, apply labels to the columns returned")
     getinfo.add_argument("-e","--enabled",dest="enabled",action="store_true",default=False,help="Optional, only return enabled domain users (only works for --users and --passnotreq flags as of now)")
+    getinfo.add_argument("-d", "--delim",dest="delimeter", default="-", required=False, help="Flag to specify output delimeter between attributes (default '-')")
 
     # MARKOWNED function paramters
     markowned.add_argument("-f","--file",dest="filename",default="",required=False,help="Filename containing AD objects (must have FQDN attached)")
@@ -1511,6 +1512,7 @@ def main():
     # QUERY function arguments
     query.add_argument("QUERY", help="Query designation")
     query.add_argument("--path",dest="path", default=False, required=False, action="store_true", help="Flag to indicate output is a path")
+    query.add_argument("-d", "--delim",dest="delimeter", default="-", required=False, help="Flag to specify output delimeter between attributes (default '-')")
 
     # EXPORT function parameters
     export.add_argument("NODENAME",help="Full name of node to extract info about (UNAME@DOMAIN/COMP.DOMAIN)")
