@@ -418,27 +418,41 @@ def mark_hvt(args):
 def query_func(args):
 
     data_format = ["row", "graph"][args.path]
+    queries = []
 
-    r = do_query(args, args.QUERY, data_format=data_format)
-    x = json.loads(r.text)
+    if args.file == None and args.query == None:
+        print("Error: query requires -q/--query or -f/--file input")
+        return
+    elif args.query:
+        queries.append(args.query)
+    elif args.file != None:
+        queries = open(args.file,'r').readlines()
 
-    try:
-        entry_list = x["results"][0]["data"]
-        cols_len = 0
+    for i in range(0,len(queries)):
 
-        for entry in entry_list:
-            if not args.path:
-                cols_len = len(entry['row'])
-            output = get_query_output(entry, args.delimeter, cols_len=cols_len, path=args.path)
-            if output != None:
-                print(output)
+        r = do_query(args, queries[i], data_format=data_format)
+        x = json.loads(r.text)
 
-    except:
-        if x['errors'][0]['code'] == "Neo.ClientError.Statement.SyntaxError":
-            print("Neo4j syntax error")
-            print(x['errors'][0]['message'])
-        else:
-            print("Uncaught error, sry")
+        try:
+            entry_list = x["results"][0]["data"]
+            cols_len = 0
+
+            for entry in entry_list:
+                if not args.path:
+                    cols_len = len(entry['row'])
+                output = get_query_output(entry, args.delimeter, cols_len=cols_len, path=args.path)
+                if output != None and args.file == None:
+                    print(output)
+
+            if args.file != None:
+                print("Query {} executed".format(i+1))
+
+        except:
+            if x['errors'][0]['code'] == "Neo.ClientError.Statement.SyntaxError":
+                print("Neo4j syntax error")
+                print(x['errors'][0]['message'])
+            else:
+                print("Uncaught error, sry")
 
 
 def export_func(args):
@@ -1510,7 +1524,8 @@ def main():
     markhvt.add_argument("--clear",dest="clear",action="store_true",help="Remove HVT marker from all objects")
 
     # QUERY function arguments
-    query.add_argument("QUERY", help="Query designation")
+    query.add_argument("-q", "--query", dest="query", default=None, help="Single query designation")
+    query.add_argument("-f", "--file", dest="file", default=None, help="File full of queries (will not show any query output)")
     query.add_argument("--path",dest="path", default=False, required=False, action="store_true", help="Flag to indicate output is a path")
     query.add_argument("-d", "--delim",dest="delimeter", default="-", required=False, help="Flag to specify output delimeter between attributes (default '-')")
 
