@@ -42,7 +42,7 @@ python3 max.py -u neo4j -p neo4j {module} {args}
 ```
 python3 max.py {module} {args}
 Neo4j Username: neo4j
-Neo4j Password: 
+Neo4j Password:
 ```
 
 ### Quick Use
@@ -128,3 +128,11 @@ computer02               <- will not be added / incorrect CLI input
 I hope to include an `analyze` function to provide some sort functionality similar to PlumHound/Cypheroth. Lastly, thinking about creating a Powershell version for those running Neo4j on Windows, but I'm trash at Powershell so TBD.
 
 Any other features and improvements welcome, find me @knavesec in the BloodHoundGang Slack channel and on Twitter
+
+
+## Contributors
+
+I'd like to especially thank those who have contributed their time to developing & improving this tool:
+
+* [Nic Losby @blurbdust](https://twitter.com/blurbdust)
+* [Scott Brink @_sandw1ch](https://twitter.com/_sandw1ch)

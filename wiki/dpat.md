@@ -27,6 +27,7 @@ This module with full usage details was released in this blog post: [whynotsecur
 * If your AD environment contains a high level of objects (>50-75k), some of these queries may take a long time, consider using the `--less` flag to eliminate high-intensity queries
 
 * This function uploads usernames/hashes/passwords to the BloodHound database, then uses Cypher queries to perfom analytics. Afterwards it will cleanse the data
+* The `-c/--crackfile` is intended to be the input Hashcat/JTR potfile, or simply a file in the format `nt/lm hash:password`
 * The `--store` flag will make sure the parsed data stays in the database after completion, if the data is already stored then you can use the `--noparse` flag to skip the initial parsing and mapping phase
 * The `--clear` flag will remove all independently
 * The `--less` flag won't run intensive queries
