@@ -86,7 +86,7 @@ python3 max.py get-info --owned --get-note
 
 Running a query - return a list of all users with a path to DA
 ```
-python3 max.py query "MATCH (n:User),(m:Group {name:'DOMAIN ADMINS@DOMAIN.LOCAL'}) MATCH (n)-[*1..]->(m) RETURN DISTINCT(n.name)"
+python3 max.py query -q "MATCH (n:User),(m:Group {name:'DOMAIN ADMINS@DOMAIN.LOCAL'}) MATCH (n)-[*1..]->(m) RETURN DISTINCT(n.name)"
 ```
 
 Delete an edge from the database
@@ -134,5 +134,5 @@ Any other features and improvements welcome, find me @knavesec in the BloodHound
 
 I'd like to especially thank those who have contributed their time to developing & improving this tool:
 
-* [Nic Losby @blurbdust](https://twitter.com/blurbdust)
-* [Scott Brink @_sandw1ch](https://twitter.com/_sandw1ch)
+* [Nic Losby @blurbdust](https://twitter.com/blurbdust) (DPAT Module)
+* [Scott Brink @_sandw1ch](https://twitter.com/_sandw1ch) (Various)

@@ -12,6 +12,7 @@ import os
 import multiprocessing
 import webbrowser
 import getpass
+import datetime
 from distutils.util import strtobool
 try:
     import html as htmllib
@@ -1070,7 +1071,7 @@ def dpat_func(args):
     print("[+] Generating Overall Statistics")
 
     # all password hashes
-    query = "MATCH (u:User) WHERE EXISTS (u.cracked) RETURN u.ntds_uname,u.password,u.nt_hash"
+    query = "MATCH (u:User) WHERE EXISTS (u.cracked) RETURN u.ntds_uname,u.password,u.nt_hash,u.pwdlastset"
     r = do_query(args,query)
     resp = json.loads(r.text)['results'][0]['data']
     num_pass_hashes = len(resp)
@@ -1079,7 +1080,7 @@ def dpat_func(args):
         length = ''
         if entry['row'][1] != None:
             length = len(entry['row'][1])
-        num_pass_hashes_list.append([entry['row'][0], entry['row'][1], length, entry['row'][2]])
+        num_pass_hashes_list.append([entry['row'][0], entry['row'][1], length, entry['row'][2], datetime.datetime.fromtimestamp(entry['row'][3])], )
     num_pass_hashes_list = sorted(num_pass_hashes_list, key = lambda x: -1 if x[1] is None else len(x[1]), reverse=True)
 
     # unique password hashes
@@ -1178,7 +1179,7 @@ def dpat_func(args):
 
     # all stats
     stats = [
-        [num_pass_hashes, "Password Hashes", ["NTDS Username", "Password", "Password Length", "NT Hash"], num_pass_hashes_list], #, ntds_parsed],
+        [num_pass_hashes, "Password Hashes", ["NTDS Username", "Password", "Password Length", "NT Hash", "Pwd Last Set"], num_pass_hashes_list], #, ntds_parsed],
         [num_uniq_hash, "Unique Password Hashes"],
         [num_cracked, "Passwords Discovered Through Cracking"],
         [perc_total_cracked, "Percent of Passwords Cracked"],
