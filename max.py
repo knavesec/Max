@@ -1287,19 +1287,16 @@ def dpat_func(args):
                 self.bodyStr += str + "</br>\n"
 
             def get_html(self):
-                js = """<script>\nfunction sortTable(n) {\n  var table, rows, switching, i, x, y, shouldSwitch, dir, switchcount = 0;\n  table = document.getElementById("DPATTable");\n  switching = true;\n  dir = "asc"; \n  while (switching) {\n    switching = false;\n    rows = table.rows;\n    for (i = 1; i < (rows.length - 1); i++) {\n      shouldSwitch = false;\n      x = rows[i].getElementsByTagName("TD")[n].innerHTML.toLowerCase();\n      x = parseInt(x) ? parseInt(x) : x;\n      y = rows[i + 1].getElementsByTagName("TD")[n].innerHTML.toLowerCase();\n      y = parseInt(y) ? parseInt(y) : y;\n      if (dir == "asc") {\n        if (x > y) {\n          shouldSwitch= true;\n          break;\n        }\n      } else if (dir == "desc") {\n        if (x < y) {\n          shouldSwitch = true;\n          break;\n        }\n      }\n    }\n    if (shouldSwitch) {\n      rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);\n      switching = true;\n      switchcount ++;      \n    } else {\n      if (switchcount == 0 && dir == "asc") {\n        dir = "desc";\n        switching = true;\n      }\n    }\n  }\n}\n</script>\n"""
-                return "<!DOCTYPE html>\n" + "<html>\n<head>\n<link rel='stylesheet' href='report.css'>\n</head>\n" + "<body>\n" + self.bodyStr + js + "</body>\n" + "</html>\n"
+                return "<!DOCTYPE html>\n" + "<html>\n<head>\n<link rel='stylesheet' href='report.css'>\n</head>\n" + "<body>\n" + self.bodyStr  + "</body>\n" + "</html>\n"
 
             def add_table_to_html(self, list, headers=[], col_to_not_escape=None):
-                html = '<table id="DPATTable" border="1">\n'
+                html = '<table border="1">\n'
                 html += "<tr>"
-                num = 1
                 for header in headers:
                     if header is not None:
-                        html += "<th onclick=\"sortTable(" + str(num) + ")\">" + str(header) + "</th>"
+                        html += "<th>" + str(header) + "</th>"
                     else:
                         html += "<th></th>"
-                    num += 1
                 html += "</tr>\n"
                 for line in list:
                     html += "<tr>"
@@ -1324,6 +1321,7 @@ def dpat_func(args):
                 f.write(self.get_html())
                 f.close()
                 return filename
+                
 
         hb = HtmlBuilder()
         summary_table = []
