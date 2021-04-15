@@ -195,6 +195,10 @@ def get_info(args):
             "query" : "MATCH (u:User {{passwordnotreqd:true}}) {enabled} RETURN u.name",
             "columns" : ["UserName"]
         },
+        "passlastset" : {
+            "query" : "MATCH (u:User) WHERE u.pwdlastset < (datetime().epochseconds - ({days} * 86400)) AND NOT u.pwdlastset IN [-1.0,0.0] RETURN u.name,date(datetime({{epochSeconds:toInteger(u.pwdlastset)}})) AS changedate ORDER BY changedate DESC",
+            "columns" : ["UserName", "DateChanged"]
+        },
         "sidhist" : {
             "query" : "MATCH (n) WHERE n.sidhistory<>[] UNWIND n.sidhistory AS x OPTIONAL MATCH (d:Domain) WHERE x CONTAINS d.objectid OPTIONAL MATCH (m {objectid:x}) RETURN n.name,x,d.name,m.name ORDER BY n.name",
             "columns" : ["ObjectName","SID","DomainName","ForeignObjectName"]
@@ -268,6 +272,9 @@ def get_info(args):
     elif (args.passnotreq):
         query = queries["passnotreq"]["query"]
         cols = queries["passnotreq"]["columns"]
+    elif (args.passlastset != ""):
+        query = queries["passlastset"]["query"].format(days=args.passlastset.strip())
+        cols = queries["passlastset"]["columns"]
     elif (args.sidhist):
         query = queries["sidhist"]["query"]
         cols = queries["sidhist"]["columns"]
@@ -1280,16 +1287,19 @@ def dpat_func(args):
                 self.bodyStr += str + "</br>\n"
 
             def get_html(self):
-                return "<!DOCTYPE html>\n" + "<html>\n<head>\n<link rel='stylesheet' href='report.css'>\n</head>\n" + "<body>\n" + self.bodyStr  + "</body>\n" + "</html>\n"
+                js = """<script>\nfunction sortTable(n) {\n  var table, rows, switching, i, x, y, shouldSwitch, dir, switchcount = 0;\n  table = document.getElementById("DPATTable");\n  switching = true;\n  dir = "asc"; \n  while (switching) {\n    switching = false;\n    rows = table.rows;\n    for (i = 1; i < (rows.length - 1); i++) {\n      shouldSwitch = false;\n      x = rows[i].getElementsByTagName("TD")[n].innerHTML.toLowerCase();\n      x = parseInt(x) ? parseInt(x) : x;\n      y = rows[i + 1].getElementsByTagName("TD")[n].innerHTML.toLowerCase();\n      y = parseInt(y) ? parseInt(y) : y;\n      if (dir == "asc") {\n        if (x > y) {\n          shouldSwitch= true;\n          break;\n        }\n      } else if (dir == "desc") {\n        if (x < y) {\n          shouldSwitch = true;\n          break;\n        }\n      }\n    }\n    if (shouldSwitch) {\n      rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);\n      switching = true;\n      switchcount ++;      \n    } else {\n      if (switchcount == 0 && dir == "asc") {\n        dir = "desc";\n        switching = true;\n      }\n    }\n  }\n}\n</script>\n"""
+                return "<!DOCTYPE html>\n" + "<html>\n<head>\n<link rel='stylesheet' href='report.css'>\n</head>\n" + "<body>\n" + self.bodyStr + js + "</body>\n" + "</html>\n"
 
             def add_table_to_html(self, list, headers=[], col_to_not_escape=None):
-                html = '<table border="1">\n'
+                html = '<table id="DPATTable" border="1">\n'
                 html += "<tr>"
+                num = 1
                 for header in headers:
                     if header is not None:
-                        html += "<th>" + str(header) + "</th>"
+                        html += "<th onclick=\"sortTable(" + str(num) + ")\">" + str(header) + "</th>"
                     else:
                         html += "<th></th>"
+                    num += 1
                 html += "</tr>\n"
                 for line in list:
                     html += "<tr>"
@@ -1492,6 +1502,7 @@ def main():
     getinfo_switch.add_argument("--kerb",dest="kerberoastable",default=False,action="store_true",help="Return a list of Kerberoastable users")
     getinfo_switch.add_argument("--kerb-la",dest="kerberoastableLA",default=False,action="store_true",help="Return a list of Kerberoastable users that have Local Admin rights in at least one place")
     getinfo_switch.add_argument("--passnotreq",dest="passnotreq",default=False,action="store_true",help="Return a list of all users that have PasswordNotRequired flag set to true")
+    getinfo_switch.add_argument("--passlastset",dest="passlastset",default="",help="Return a list of all users that have their password last set over X days ago, ordered by date")
     getinfo_switch.add_argument("--sidhist",dest="sidhist",default=False,action="store_true",help="Return a list of objects configured with SID History")
     getinfo_switch.add_argument("--foreignprivs",dest="foreignprivs",default=False,action="store_true",help="Return a list of objects that have controlling privileges into other domains")
     getinfo_switch.add_argument("--unsupported",dest="unsupos",default=False,action="store_true",help="Return a list of computers running an unsupported OS")
