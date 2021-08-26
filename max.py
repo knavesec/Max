@@ -123,6 +123,10 @@ def get_info(args):
             "query" : "MATCH (g:Group {{name:\"{gname}\"}}) MATCH (n)-[r:MemberOf*1..]->(g) RETURN DISTINCT n.name",
             "columns" : ["ObjectName"]
         },
+        "group-list" : {
+            "query" : "MATCH (u {{name:\"{uname}\"}}) MATCH (u)-[r:MemberOf*1..]->(g:Group) RETURN DISTINCT g.name",
+            "columns" : ["GroupName"]
+        },
         "groups-full" : {
             "query" : "MATCH (n),(g:Group) MATCH (n)-[r:MemberOf]->(g) RETURN DISTINCT g.name,n.name",
             "columns" : ["GroupName","MemberName"]
@@ -314,6 +318,9 @@ def get_info(args):
     elif (args.comp != ""):
         query = queries["adminsof"]["query"].format(comp=args.comp.upper().strip())
         cols = queries["adminsof"]["columns"]
+    elif (args.grouplist != ""):
+        query = queries["group-list"]["query"].format(uname=args.grouplist.upper().strip())
+        cols = queries["group-list"]["columns"]
     elif (args.groupmems != ""):
         query = queries["group-members"]["query"].format(gname=args.groupmems.upper().strip())
         cols = queries["group-members"]["columns"]
@@ -1321,7 +1328,7 @@ def dpat_func(args):
                 f.write(self.get_html())
                 f.close()
                 return filename
-                
+
 
         hb = HtmlBuilder()
         summary_table = []
@@ -1491,6 +1498,7 @@ def main():
     getinfo_switch.add_argument("--groups",dest="groups",default=False,action="store_true",help="Return a list of all domain groups")
     getinfo_switch.add_argument("--groups-full",dest="groupsfull",default=False,action="store_true",help="Return a list of all domain groups with all respective group members")
     getinfo_switch.add_argument("--group-members",dest="groupmems",default="",help="Return a list of all members of an input GROUP@DOMAIN.LOCAL")
+    getinfo_switch.add_argument("--group-list",dest="grouplist",default="",help="Return a list of all groups of an input USERNAME@DOMAIN.LOCAL")
     getinfo_switch.add_argument("--das",dest="das",default=False,action="store_true",help="Return a list of all Domain Admins")
     getinfo_switch.add_argument("--dasessions",dest="dasess",default=False,action="store_true",help="Return a list of Domain Admin sessions")
     getinfo_switch.add_argument("--dcs",dest="dcs",default=False,action="store_true",help="Return a list of all Domain Controllers")
