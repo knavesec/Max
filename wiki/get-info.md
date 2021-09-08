@@ -30,6 +30,7 @@ There are a few things you can extract with this module:
 * `path` will return the full shortest path between two input nodes, `paths-all` will return all the shortest paths
 * `hvt-paths` will return all paths to HVTs originating from an input node
 * `owned-paths` will return all paths to HVTs originating from an input node
+* `owned-admins` will return all computers to which owned users are admins 
 * `-l` apply column labels as a header. All queries with `get-info` do not return column headers (like "UserName","ComputerName","Description",etc) by default with the query
 * `-e/--enabled` returns only the enabled users from the applicable query (only working for `--users` and `--passnotreq`)
 * `d/delim` Is a flag where a new output delimeter can be set to separate outputs. Default is `output1 - output2` with the "-" being the changable delimeter. Doesn't apply to path outputs
@@ -90,4 +91,11 @@ ADMINISTRATOR@DOMAIN.LOCAL - MemberOf -> ADMINISTRATORS@DOMAIN.LOCAL - WriteDacl
 ADMINISTRATOR@DOMAIN.LOCAL - MemberOf -> ADMINISTRATORS@DOMAIN.LOCAL - AllExtendedRights -> DOMAIN.LOCAL
 ADMINISTRATOR@DOMAIN.LOCAL - MemberOf -> ADMINISTRATORS@DOMAIN.LOCAL - WriteOwner -> DOMAIN.LOCAL
 
+```
+```python
+python3 max.py get-info --owned-admins
+
+COMP1.DOMAIN.LOCAL - AdministratedBy - USER1@DOMAIN.LOCAL
+COMP2.DOMAIN.LOCAL - AdministratedBy - USER1@DOMAIN.LOCAL
+COMP2.DOMAIN.LOCAL - AdministratedBy - USER2@DOMAIN.LOCAL
 ```
