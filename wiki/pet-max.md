@@ -1,6 +1,6 @@
 ## Module: pet-max
 
-Its adorable. That is all.
+It's adorable. That is all.
 
 "Arguably the most important contribution to this project" - me
 
