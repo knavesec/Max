@@ -92,7 +92,7 @@ ADMINISTRATOR@DOMAIN.LOCAL - MemberOf -> ADMINISTRATORS@DOMAIN.LOCAL - AllExtend
 ADMINISTRATOR@DOMAIN.LOCAL - MemberOf -> ADMINISTRATORS@DOMAIN.LOCAL - WriteOwner -> DOMAIN.LOCAL
 
 ```
-```python
+```
 python3 max.py get-info --owned-admins
 
 COMP1.DOMAIN.LOCAL - AdministratedBy - USER1@DOMAIN.LOCAL
