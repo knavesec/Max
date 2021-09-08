@@ -98,4 +98,5 @@ python3 max.py get-info --owned-admins
 COMP1.DOMAIN.LOCAL - AdministratedBy - USER1@DOMAIN.LOCAL
 COMP2.DOMAIN.LOCAL - AdministratedBy - USER1@DOMAIN.LOCAL
 COMP2.DOMAIN.LOCAL - AdministratedBy - USER2@DOMAIN.LOCAL
+...
 ```
