@@ -25,9 +25,9 @@ from itertools import zip_longest
 global_url = "http://127.0.0.1:7474"
 global_uri = "/db/data/transaction/commit"
 
-# option to hardcode creds, these will be used as the username and password "defaults"
-global_username = "neo4j"
-global_password = "bloodhound"
+# option to hardcode creds or put them in environment variables, these will be used as the username and password "defaults"
+global_username = 'neo4j' if (not os.environ.get('NEO4J_USERNAME', False)) else os.environ['NEO4J_USERNAME']
+global_password = 'bloodhound' if (not os.environ.get('NEO4J_PASSWORD', False)) else os.environ['NEO4J_PASSWORD'] 
 
 def do_test(args):
 
@@ -234,6 +234,10 @@ def get_info(args):
         "ownedpaths" : {
             "query" : "MATCH p=allShortestPaths((n1 {owned:true})-[rels*1..]->(n2 {highvalue:true})) RETURN p",
             "columns" : ["Path"]
+        },
+        "ownedadmins" : {
+            "query": "match p=(u:User {owned: True})-[r:AdminTo|MemberOf*1..]->(c:Computer) return c.name, \"AdministratedBy\", u.name order by c",
+            "columns": ["ComputerName", "HasAdmin", "UserName"]
         }
     }
 
@@ -324,6 +328,9 @@ def get_info(args):
     elif (args.groupmems != ""):
         query = queries["group-members"]["query"].format(gname=args.groupmems.upper().strip())
         cols = queries["group-members"]["columns"]
+    elif (args.ownedadmins):
+        query = queries.get("ownedadmins", {}).get("query", "")
+        cols = queries.get("ownedadmins", {}).get("columns", [""])
     elif (args.path != ""):
         start = args.path.split(',')[0].strip().upper()
         end = args.path.split(',')[1].strip().upper()
@@ -1439,7 +1446,8 @@ def pet_max():
         "Wear a mask!",
         "Hack the planet!",
         "10/10 would pet - @blurbdust",
-        "dogsay > cowsay - @b1gbroth3r"
+        "dogsay > cowsay - @b1gbroth3r",
+        "much query, very sniff - @vexance"
     ]
 
     max = """
@@ -1525,6 +1533,7 @@ def main():
     getinfo_switch.add_argument("--paths-all",dest="pathsall",default="",help="Return all paths between two comma separated input nodes \"NODE1@DOMAIN.LOCAL, NODE 2@DOMAIN.LOCAL\" ")
     getinfo_switch.add_argument("--hvt-paths",dest="hvtpaths",default="",help="Return all paths from the input node to HVTs")
     getinfo_switch.add_argument("--owned-paths",dest="ownedpaths",default=False,action="store_true",help="Return all paths from owned objects to HVTs")
+    getinfo_switch.add_argument("--owned-admins", dest="ownedadmins",default=False,action="store_true",help="Return all computers owned users are admins to")
 
     getinfo.add_argument("--get-note",dest="getnote",default=False,action="store_true",help="Optional, return the \"notes\" attribute for whatever objects are returned")
     getinfo.add_argument("-l",dest="label",action="store_true",default=False,help="Optional, apply labels to the columns returned")
