@@ -236,7 +236,7 @@ def get_info(args):
             "columns" : ["Path"]
         },
         "ownedadmins" : {
-            "query": "match p=(u:User {owned: True})-[r:AdminTo|MemberOf*1..]->(c:Computer) return c.name, \"AdministratedBy\", u.name order by c",
+            "query": "match (u:User {owned: True})-[r:AdminTo|MemberOf*1..]->(c:Computer) return c.name, \"AdministratedBy\", u.name order by c, u",
             "columns": ["ComputerName", "HasAdmin", "UserName"]
         }
     }
