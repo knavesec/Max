@@ -33,7 +33,13 @@ Ideally there shouldn't be much to install, but I've included a requirements.txt
 
 ### Neo4j Creds
 
-Neo4j credentials can be hardcoded at the beginning of the script *OR* they can be provided as CLI. If both areas are left blank, you will be prompted for the uname/password.
+Neo4j credentials can be hardcoded at the beginning of the script, they can be provided as CLI arguments, or stored as environment variables. If either parameter  is left blank, you will be prompted for the uname/password. To use environment variables, it is probably easiest to add a line (e.g., `export NEO4J_USERNAME='neo4j'`) within *~/.bashrc* or *~/.zshrc*  to store the username since it isn't really sensitive. The database password can be set within your shell's tab prior to running Max. Adding a space before the export command should prevent it from appearing within history.
+
+```bash
+ export NEO4J_PASSWORD='bloodhound' # Notice whitespace before 'export'
+python3 max.py {module} {args}
+
+```
 
 ```
 python3 max.py -u neo4j -p neo4j {module} {args}
