@@ -329,8 +329,8 @@ def get_info(args):
         query = queries["group-members"]["query"].format(gname=args.groupmems.upper().strip())
         cols = queries["group-members"]["columns"]
     elif (args.ownedadmins):
-        query = queries.get("ownedadmins", {}).get("query", "")
-        cols = queries.get("ownedadmins", {}).get("columns", [""])
+        query = queries["ownedadmins"]["query"]
+        cols = queries["ownedadmins"]["columns"]
     elif (args.path != ""):
         start = args.path.split(',')[0].strip().upper()
         end = args.path.split(',')[1].strip().upper()
