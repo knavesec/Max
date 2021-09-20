@@ -108,7 +108,7 @@ python3 max.py add-spns -i getuserspns-raw-output.txt
 
 DPAT
 ```
-python3 max.py dpat -n ~/client/ntds.dit -p ~/.hashcat/hashcat.potfile -o ouputdir --html --sanitize
+python3 max.py dpat -n ~/client/ntds.dit -c ~/.hashcat/hashcat.potfile -o ouputdir --html --sanitize
 ```
 
 Pet max
