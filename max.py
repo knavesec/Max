@@ -1216,6 +1216,17 @@ def dpat_func(args):
     if not args.less:
         stats.append([len(group_data), "Groups Cracked by Percentage",  ["Group Name", "Percent Cracked", "Cracked Users", "Total Users"], group_data])
 
+    # set all users with cracked passwords as owned
+    if args.own_cracked:
+        print("[+] Marking cracked users as owned")
+        own_cracked_query="MATCH (u:User {cracked:True}) SET u.owned=true"
+        do_query(args,own_cracked_query)
+    
+    # Add a note to users with cracked passwords indicating that they have been cracked
+    if args.add_crack_note:
+        print('[+] Adding notes to cracked users')
+        add_crack_note_query="MATCH (u:User {cracked=True} SET u.notes=\"Password Cracked\""
+        do_query(args,add_crack_note_query)
 
     # clear the "cracked" tag
     if not args.store and not args.noparse:
@@ -1586,6 +1597,8 @@ def main():
     dpat.add_argument("-o","--output",dest="output",default="",required=False,help="Output file/dir name to store results, ASCII art if not set")
     dpat.add_argument("--csv",dest="csv",action="store_true",required=False,help="Store the output in a CSV format")
     dpat.add_argument("--html",dest="html",action="store_true",required=False,help="Store the output in HTML format")
+    dpat.add_argument("--own-cracked", dest="own_cracked", action="store_true", required=False, help="Mark all users with cracked passwords as owned")
+    dpat.add_argument("--add-crack-note",dest="add_crack_note",action="store_true",required=False,help="Add a note to cracked users indicating they have been cracked")
 
     args = parser.parse_args()
 
