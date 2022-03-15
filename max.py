@@ -27,7 +27,7 @@ global_uri = "/db/data/transaction/commit"
 
 # option to hardcode creds or put them in environment variables, these will be used as the username and password "defaults"
 global_username = 'neo4j' if (not os.environ.get('NEO4J_USERNAME', False)) else os.environ['NEO4J_USERNAME']
-global_password = 'bloodhound' if (not os.environ.get('NEO4J_PASSWORD', False)) else os.environ['NEO4J_PASSWORD'] 
+global_password = 'bloodhound' if (not os.environ.get('NEO4J_PASSWORD', False)) else os.environ['NEO4J_PASSWORD']
 
 def do_test(args):
 
@@ -504,7 +504,25 @@ def export_func(args):
         "SQLAdmin",
         "HasSIDHistory",
         "HasSPNConfigured",
-        "SharesPasswordWith"
+        "SharesPasswordWith",
+        "GetChanges",
+        "GetChangesAll",
+        "TrustedBy",
+
+        "AZAddMembers",
+        "AZAppAdmin",
+        "AZCloudAppAdmin",
+        "AZContains",
+        "AZContributor",
+        "AZGetCertificates",
+        "AZGetKeys",
+        "AZGetSecrets",
+        "AZGlobalAdmin",
+        "AZPrivilegedRoleAdmin",
+        "AZResetPassword",
+        "AZRunAs",
+        "AZUserAccessAdministrator"
+
     ]
 
     node_name = args.NODENAME.upper().strip()
@@ -959,7 +977,7 @@ def dpat_func(args):
             "label" : "Accounts With Explicit Admin Rights Cracked"
         },
         {
-            "query" : "MATCH p2=(u:User {cracked:true})-[r1:MemberOf*1..]->(g:Group)-[r2:AdmintTo]->(n2) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
+            "query" : "MATCH p2=(u:User {cracked:true})-[r1:MemberOf*1..]->(g:Group)-[r2:AdminTo]->(n2) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
             "label" : "Accounts With Group Delegated Admin Rights Cracked"
         },
         {
@@ -969,7 +987,15 @@ def dpat_func(args):
         {
             "query" : "MATCH p2=(u:User {cracked:true})-[r1:MemberOf*1..]->(g:Group)-[r2:AllExtendedRights|AddMember|ForceChangePassword|GenericAll|GenericWrite|Owns|WriteDacl|WriteOwner|ReadLAPSPassword|ReadGMSAPassword|CanRDP|CanPSRemote|ExecuteDCOM|AllowedToDelegate|AddAllowedToAct|AllowedToAct|SQLAdmin|HasSIDHistory]->(n2) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
             "label" : "Accounts With Group Delegated Controlling Privileges Cracked"
-        }
+        },
+        {
+            "query" : "MATCH p1=(u:User {cracked:true})-[r:AZAddMembers|AZAppAdmin|AZCloudAppAdmin|AZContains|AZContributor|AZGetCertificates|AZGetKeys|AZGetSecrets|AZGlobalAdmin|AZPrivilegedRoleAdmin|AZResetPassword|AZRunAs|AZUserAccessAdministrator]->(n1) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
+            "label" : "Accounts With Azure AD Controlling Privileges Cracked"
+        },
+        {
+            "query" : "MATCH p2=(u:User {cracked:true})-[r1:MemberOf*1..]->(g:Group)-[r2:AZAddMembers|AZAppAdmin|AZCloudAppAdmin|AZContains|AZContributor|AZGetCertificates|AZGetKeys|AZGetSecrets|AZGlobalAdmin|AZPrivilegedRoleAdmin|AZResetPassword|AZRunAs|AZUserAccessAdministrator]->(n2) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
+            "label" : "Accounts With Group Delegated Azure AD Controlling Privileges Cracked"
+        },
     ]
 
     if not args.less:
@@ -1221,7 +1247,7 @@ def dpat_func(args):
         print("[+] Marking cracked users as owned")
         own_cracked_query="MATCH (u:User {cracked:True}) SET u.owned=true"
         do_query(args,own_cracked_query)
-    
+
     # Add a note to users with cracked passwords indicating that they have been cracked
     if args.add_crack_note:
         print('[+] Adding notes to cracked users')
