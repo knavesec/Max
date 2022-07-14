@@ -556,11 +556,15 @@ def export_func(args):
 
 
 def delete_edge(args):
-
-    query = 'MATCH p=()-[r:{edge}]->() DELETE r RETURN COUNT(DISTINCT(p))'.format(edge=args.EDGENAME)
+    if args.STARTINGNODE:
+        query = 'MATCH ({{name:"{startingnode}"}})-[r:{edge}]->() DELETE r RETURN COUNT (DISTINCT("{startingnode}"))'.format(edge=args.EDGENAME,startingnode=args.STARTINGNODE)
+        filters = 'with \'{startingnode}\' starting node'.format(startingnode=args.STARTINGNODE)
+    else:
+        query = 'MATCH p=()-[r:{edge}]->() DELETE r RETURN COUNT(DISTINCT(p))'.format(edge=args.EDGENAME) 
+        filters = ''                          
     r = do_query(args,query)
     number = int(json.loads(r.text)['results'][0]['data'][0]['row'][0] / 2)
-    print("[+] '{edge}' edge removed from {number} object relationships".format(edge=args.EDGENAME,number=number))
+    print("[+] '{edge}' edge removed from {number} object relationships {filters}".format(edge=args.EDGENAME,number=number,filters=filters))
 
 
 def add_spns(args):
@@ -1573,6 +1577,7 @@ def main():
 
     # DELETEEDGE function parameters
     deleteedge.add_argument("EDGENAME",help="Edge name, example: CanRDP, ExecuteDCOM, etc")
+    deleteedge.add_argument("--starting-node",dest="STARTINGNODE",default="",required=False,help="Remove relationship from a specific node.")
 
     # ADDSPNS function parameters
     addspns_switch = addspns.add_mutually_exclusive_group(required=True)
