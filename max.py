@@ -892,6 +892,10 @@ def dpat_func(args):
             'label' : "All User Accounts Cracked"
         },
         {
+            "query" : "MATCH p=(u:User {cracked:true}) WHERE u.enabled = TRUE RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
+            "label" : "Enabled User Accounts Cracked"
+        },
+        {
             'query' : "MATCH p=(u:User {cracked:true})-[r:MemberOf*1..]->(g:Group {highvalue:true}) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
             'label' : "High Value User Accounts Cracked"
         },
