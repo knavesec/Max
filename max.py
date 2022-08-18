@@ -21,9 +21,9 @@ except ImportError:
 from itertools import zip_longest
 
 
-# option to hardcode URL & URI
-global_url = "http://127.0.0.1:7474"
-global_uri = "/db/data/transaction/commit"
+# option to hardcode URL & URI or put them in environment variables, these will be used for neo4j database "default" location
+global_url = "http://127.0.0.1:7474" if (not os.environ.get('NEO4J_URL', False)) else os.environ['NEO4J_URL']
+global_uri = "/db/data/transaction/commit" if (not os.environ.get('NEO4J_URI', False)) else os.environ['NEO4J_URI']
 
 # option to hardcode creds or put them in environment variables, these will be used as the username and password "defaults"
 global_username = 'neo4j' if (not os.environ.get('NEO4J_USERNAME', False)) else os.environ['NEO4J_USERNAME']
@@ -890,6 +890,10 @@ def dpat_func(args):
         {
             'query' : "MATCH (u:User {cracked:true}) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
             'label' : "All User Accounts Cracked"
+        },
+        {
+            "query" : "MATCH p=(u:User {cracked:true}) WHERE u.enabled = TRUE RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
+            "label" : "Enabled User Accounts Cracked"
         },
         {
             'query' : "MATCH p=(u:User {cracked:true})-[r:MemberOf*1..]->(g:Group {highvalue:true}) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
