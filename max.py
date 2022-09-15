@@ -13,7 +13,6 @@ import multiprocessing
 import webbrowser
 import getpass
 import datetime
-from distutils.util import strtobool
 try:
     import html as htmllib
 except ImportError:
@@ -1401,15 +1400,14 @@ def dpat_func(args):
         # the code to prompt user to open the file was borrowed from the DPAT tool which borrowed it from the EyeWitness tool https://github.com/ChrisTruncer/EyeWitness
         print('[+] Would you like to open the report now? [Y/n]')
         while True:
-            try:
-                response = input().lower().rstrip('\r')
-                if ((response == "") or (strtobool(response))):
-                    webbrowser.open(os.path.join("file://" + os.getcwd(),
-                                                 filebase, filename_report))
-                    break
-                else:
-                    break
-            except ValueError:
+            response = input().lower().rstrip('\r')
+            if ((response == "") or (response == 'y') or (response == "yes")):
+                webbrowser.open(os.path.join("file://" + os.getcwd(),
+                                            filebase, filename_report))
+                break
+            elif ((reponse == 'n') or (response == "no")):
+                break
+            else:
                 print("[-] Please respond with y or n")
 
 
