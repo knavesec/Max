@@ -1108,7 +1108,10 @@ def dpat_func(args):
         length = ''
         if entry['row'][1] != None:
             length = len(entry['row'][1])
-        num_pass_hashes_list.append([entry['row'][0], entry['row'][1], length, entry['row'][2], datetime.datetime.fromtimestamp(entry['row'][3])], )
+        try:
+            num_pass_hashes_list.append([entry['row'][0], entry['row'][1], length, entry['row'][2], datetime.datetime.fromtimestamp(entry['row'][3])], )
+        except:
+            num_pass_hashes_list.append([entry['row'][0], entry['row'][1], length, entry['row'][2], ''], )
     num_pass_hashes_list = sorted(num_pass_hashes_list, key = lambda x: -1 if x[1] is None else len(x[1]), reverse=True)
 
     # unique password hashes
