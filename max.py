@@ -13,7 +13,6 @@ import multiprocessing
 import webbrowser
 import getpass
 import datetime
-from distutils.util import strtobool
 try:
     import html as htmllib
 except ImportError:
@@ -556,11 +555,15 @@ def export_func(args):
 
 
 def delete_edge(args):
-
-    query = 'MATCH p=()-[r:{edge}]->() DELETE r RETURN COUNT(DISTINCT(p))'.format(edge=args.EDGENAME)
+    if args.STARTINGNODE:
+        query = 'MATCH ({{name:"{startingnode}"}})-[r:{edge}]->() DELETE r RETURN COUNT (DISTINCT("{startingnode}"))'.format(edge=args.EDGENAME,startingnode=args.STARTINGNODE)
+        filters = 'with \'{startingnode}\' starting node'.format(startingnode=args.STARTINGNODE)
+    else:
+        query = 'MATCH p=()-[r:{edge}]->() DELETE r RETURN COUNT(DISTINCT(p))'.format(edge=args.EDGENAME) 
+        filters = ''                          
     r = do_query(args,query)
     number = int(json.loads(r.text)['results'][0]['data'][0]['row'][0] / 2)
-    print("[+] '{edge}' edge removed from {number} object relationships".format(edge=args.EDGENAME,number=number))
+    print("[+] '{edge}' edge removed from {number} object relationships {filters}".format(edge=args.EDGENAME,number=number,filters=filters))
 
 
 def add_spns(args):
@@ -1105,7 +1108,10 @@ def dpat_func(args):
         length = ''
         if entry['row'][1] != None:
             length = len(entry['row'][1])
-        num_pass_hashes_list.append([entry['row'][0], entry['row'][1], length, entry['row'][2], datetime.datetime.fromtimestamp(entry['row'][3])], )
+        try:
+            num_pass_hashes_list.append([entry['row'][0], entry['row'][1], length, entry['row'][2], datetime.datetime.fromtimestamp(entry['row'][3])], )
+        except:
+            num_pass_hashes_list.append([entry['row'][0], entry['row'][1], length, entry['row'][2], ''], )
     num_pass_hashes_list = sorted(num_pass_hashes_list, key = lambda x: -1 if x[1] is None else len(x[1]), reverse=True)
 
     # unique password hashes
@@ -1397,15 +1403,14 @@ def dpat_func(args):
         # the code to prompt user to open the file was borrowed from the DPAT tool which borrowed it from the EyeWitness tool https://github.com/ChrisTruncer/EyeWitness
         print('[+] Would you like to open the report now? [Y/n]')
         while True:
-            try:
-                response = input().lower().rstrip('\r')
-                if ((response == "") or (strtobool(response))):
-                    webbrowser.open(os.path.join("file://" + os.getcwd(),
-                                                 filebase, filename_report))
-                    break
-                else:
-                    break
-            except ValueError:
+            response = input().lower().rstrip('\r')
+            if ((response == "") or (response == 'y') or (response == "yes")):
+                webbrowser.open(os.path.join("file://" + os.getcwd(),
+                                            filebase, filename_report))
+                break
+            elif ((reponse == 'n') or (response == "no")):
+                break
+            else:
                 print("[-] Please respond with y or n")
 
 
@@ -1577,6 +1582,7 @@ def main():
 
     # DELETEEDGE function parameters
     deleteedge.add_argument("EDGENAME",help="Edge name, example: CanRDP, ExecuteDCOM, etc")
+    deleteedge.add_argument("--starting-node",dest="STARTINGNODE",default="",required=False,help="Remove relationship from a specific node.")
 
     # ADDSPNS function parameters
     addspns_switch = addspns.add_mutually_exclusive_group(required=True)
