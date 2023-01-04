@@ -142,3 +142,4 @@ I'd like to especially thank those who have contributed their time to developing
 
 * [Nic Losby @blurbdust](https://twitter.com/blurbdust) (DPAT Module)
 * [Scott Brink @_sandw1ch](https://twitter.com/_sandw1ch) (Various)
+* [Logan @TheToddLuci0](https://twitter.com/TheToddLuci0) (Many PRs)
