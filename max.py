@@ -1408,7 +1408,7 @@ def dpat_func(args):
                 webbrowser.open(os.path.join("file://" + os.getcwd(),
                                             filebase, filename_report))
                 break
-            elif ((reponse == 'n') or (response == "no")):
+            elif ((response == 'n') or (response == "no")):
                 break
             else:
                 print("[-] Please respond with y or n")
