@@ -22,7 +22,7 @@ from itertools import zip_longest
 
 # option to hardcode URL & URI or put them in environment variables, these will be used for neo4j database "default" location
 global_url = "http://127.0.0.1:7474" if (not os.environ.get('NEO4J_URL', False)) else os.environ['NEO4J_URL']
-global_uri = "/db/data/transaction/commit" if (not os.environ.get('NEO4J_URI', False)) else os.environ['NEO4J_URI']
+global_uri = "/db/neo4j/tx/commit" if (not os.environ.get('NEO4J_URI', False)) else os.environ['NEO4J_URI']
 
 # option to hardcode creds or put them in environment variables, these will be used as the username and password "defaults"
 global_username = 'neo4j' if (not os.environ.get('NEO4J_USERNAME', False)) else os.environ['NEO4J_USERNAME']
@@ -55,6 +55,9 @@ def do_query(args, query, data_format=None):
 
     if r.status_code == 401:
         print("Authentication error: the supplied credentials are incorrect for the Neo4j database, specify new credentials with -u & -p or hardcode your credentials at the top of the script")
+        exit()
+    elif r.status_code >= 300:
+        print("Failed to retrieve data. Server returned status code: {}".format(r.status_code))
         exit()
     else:
         return r
@@ -743,6 +746,7 @@ def dpat_map_users(args, users, potfile):
                 count = count + 1
 
         except Exception as g:
+            print("[-] Mapping ERROR: {} FOR USER {}".format(g, user[0]))
             # print('{}'.format(g))
             # print(query1)
             pass
@@ -787,7 +791,6 @@ def dpat_func(args):
                 start = math.ceil((num_lines / num_threads) * t)
                 end = math.ceil((num_lines / num_threads) * (t + 1))
                 p = multiprocessing.Process(target=dpat_parse_ntds, args=(ntds[ start : end ], ntds_parsed, ))
-                #print("[*] Starting thread {} with {} to {}".format(t, start, end))
                 p.start()
                 procs.append(p)
             for p_ in procs:
@@ -800,7 +803,6 @@ def dpat_func(args):
             """
             ntds_parsed = list(ntds_parsed)
             # done parsing
-
 
             print("[+] Processing Potfile")
             # password stats like counting reused cracked passwords
@@ -833,14 +835,13 @@ def dpat_func(args):
                 start = math.ceil((num_lines / num_threads) * t)
                 end = math.ceil((num_lines / num_threads) * (t + 1))
                 p = multiprocessing.Process(target=dpat_map_users, args=(args, ntds_parsed[ start : end ], potfile, ))
-                #print("[*] Starting thread {} with {} to {}".format(t, start, end))
                 p.start()
                 procs.append(p)
             for p_ in procs:
                 p_.join()
 
 
-            count_query = "MATCH (u:User) WHERE EXISTS(u.cracked) RETURN COUNT(u.name)"
+            count_query = "MATCH (u:User) WHERE u.cracked IS NOT NULL RETURN COUNT(u.name)"
             r = do_query(args,count_query)
             resp = json.loads(r.text)['results'][0]['data']
             count = resp[0]['row'][0]
@@ -997,7 +998,7 @@ def dpat_func(args):
     query_output_data = []
 
     hashes = {}
-    query = "MATCH (u:User) WHERE EXISTS(u.nt_hash) RETURN u.nt_hash,u.ntds_uname"
+    query = "MATCH (u:User) WHERE u.nt_hash IS NOT NULL RETURN u.nt_hash,u.ntds_uname"
     r = do_query(args,query)
     resp = json.loads(r.text)['results'][0]['data']
 
@@ -1099,7 +1100,7 @@ def dpat_func(args):
     print("[+] Generating Overall Statistics")
 
     # all password hashes
-    query = "MATCH (u:User) WHERE EXISTS (u.cracked) RETURN u.ntds_uname,u.password,u.nt_hash,u.pwdlastset"
+    query = "MATCH (u:User) WHERE u.cracked IS NOT NULL RETURN u.ntds_uname,u.password,u.nt_hash,u.pwdlastset"
     r = do_query(args,query)
     resp = json.loads(r.text)['results'][0]['data']
     num_pass_hashes = len(resp)
@@ -1137,7 +1138,7 @@ def dpat_func(args):
         perc_uniq_cracked = 00.00
 
     # lm hash stats
-    query = "MATCH (u:User) WHERE EXISTS (u.lm_hash) AND NOT u.lm_hash='aad3b435b51404eeaad3b435b51404ee' RETURN u.lm_hash,count(u.lm_hash)"
+    query = "MATCH (u:User) WHERE u.lm_hash IS NOT NULL AND NOT u.lm_hash='aad3b435b51404eeaad3b435b51404ee' RETURN u.lm_hash,count(u.lm_hash)"
     r = do_query(args,query)
     resp = json.loads(r.text)['results'][0]['data']
     lm_hash_counts = {}
@@ -1147,7 +1148,7 @@ def dpat_func(args):
     uniq_lm = len(lm_hash_counts)
 
     # lm hash users
-    query = "MATCH (u:User) WHERE EXISTS (u.lm_hash) AND NOT u.lm_hash='aad3b435b51404eeaad3b435b51404ee' RETURN u.name,u.lm_hash"
+    query = "MATCH (u:User) WHERE u.lm_hash IS NOT NULL AND NOT u.lm_hash='aad3b435b51404eeaad3b435b51404ee' RETURN u.name,u.lm_hash"
     r = do_query(args,query)
     resp = json.loads(r.text)['results'][0]['data']
 
@@ -1408,7 +1409,7 @@ def dpat_func(args):
                 webbrowser.open(os.path.join("file://" + os.getcwd(),
                                             filebase, filename_report))
                 break
-            elif ((reponse == 'n') or (response == "no")):
+            elif ((response == 'n') or (response == "no")):
                 break
             else:
                 print("[-] Please respond with y or n")
