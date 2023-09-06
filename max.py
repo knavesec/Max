@@ -402,7 +402,8 @@ def mark_owned(args):
         for line in f:
 
             if args.userpass is True or args.store:
-                uname, passwd = line.upper().strip().split(':')
+                uname, passwd = line.strip().split(':')
+                uname = uname.upper()
                 if args.store:
                     passwd_query = "SET n.password=\"" + passwd + "\""
                 else:
