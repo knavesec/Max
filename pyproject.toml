@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools", "setuptools_scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "max-bh"
+readme ="README.md"
+description = "Maximizing Bloodhound"
+requires-python = ">=3.7"
+dependencies = [
+    "requests"
+]
+dynamic = ['version']
+
+[project.scripts]
+max = "max.max:main"
+
+# [tool.setuptools.packages.find]
+# include = ['max-bh']
+
+[tool.setuptools_scm]
