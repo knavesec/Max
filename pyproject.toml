@@ -15,7 +15,9 @@ dynamic = ['version']
 [project.scripts]
 max = "max.max:main"
 
-# [tool.setuptools.packages.find]
-# include = ['max-bh']
+[tool.setuptools.packages.find]
+include = ['max-bh']
 
 [tool.setuptools_scm]
+# This is so pypi will actually accept the package
+local_scheme = "no-local-version"
