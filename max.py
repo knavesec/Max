@@ -13,6 +13,8 @@ import multiprocessing
 import webbrowser
 import getpass
 import datetime
+import hashlib
+import binascii
 try:
     import html as htmllib
 except ImportError:
@@ -1455,6 +1457,41 @@ def dpat_func(args):
         print("")
         print("")
 
+def weak_machine(args):
+    get_machine_password = lambda machine_name: machine_name.rstrip('$').lower()[:14]
+    query = "MATCH (n:Computer {enabled: True}) RETURN n.samaccountname"
+    r = do_query(args, query)
+    x = json.loads(r.text)
+    entry_list = x["results"][0]["data"]
+
+    if args.ntdsfile != None:
+        machines = {}
+        ntds = open(args.ntdsfile, 'r').readlines()
+        for line in ntds:
+            if ":::" not in line or '$' not in line:
+                continue
+            line = line.replace("\r", "").replace("\n", "")
+            if (line == ""):
+                continue
+            else:
+                line = line.split(":")
+            machines[line[0]] = line[3]
+
+    for value in entry_list:
+        machine_name = value["row"][0]
+        machine_password = get_machine_password(machine_name)
+
+        if args.ntdsfile is None:
+            print(f"{machine_name}:{machine_password}")
+        else:
+            machine_ntds_ntlm = machines.get(machine_name)
+            if machine_ntds_ntlm:
+                hash = hashlib.new("md4", machine_password.encode("UTF-16LE")).digest()
+                machine_ntlm = binascii.hexlify(hash).decode()
+
+                if machine_ntds_ntlm == machine_ntlm:
+                    print(f"{machine_name}:{machine_password}")
+
 
 def pet_max():
 
@@ -1518,6 +1555,7 @@ def main():
     addspns = switch.add_parser("add-spns",help="Create 'HasSPNConfigured' relationships with targets from a file or stored BloodHound data. Adds possible path of compromise edge via cleartext service account credentials stored within LSA Secrets")
     addspw = switch.add_parser("add-spw",help="Create 'SharesPasswordWith' relationships with targets from a file. Adds edge indicating two objects share a password (repeated local administrator)")
     dpat = switch.add_parser("dpat",help="BloodHound Domain Password Audit Tool, run cracked user-password analysis tied with BloodHound through a Hashcat potfile & NTDS")
+    weakmachine = switch.add_parser("weak-machine",help="Get weak machines account dictionary or enumerate them with NTDS")
     petmax = switch.add_parser("pet-max",help="Pet max, hes a good boy (pet me again, I say different things)")
 
     # GETINFO function parameters
@@ -1611,6 +1649,9 @@ def main():
     dpat.add_argument("--own-cracked", dest="own_cracked", action="store_true", required=False, help="Mark all users with cracked passwords as owned")
     dpat.add_argument("--add-crack-note",dest="add_crack_note",action="store_true",required=False,help="Add a note to cracked users indicating they have been cracked")
 
+    # WEAK_MACHINE function parameters
+    weakmachine.add_argument("-n","--ntds",dest="ntdsfile",default=None,required=False,help="NTDS file name")
+
     args = parser.parse_args()
 
 
@@ -1651,6 +1692,8 @@ def main():
         add_spw(args)
     elif args.command == "dpat":
         dpat_func(args)
+    elif args.command == "weak-machine":
+        weak_machine(args)
     elif args.command == "pet-max":
         pet_max()
     # else:
