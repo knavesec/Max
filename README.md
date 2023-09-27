@@ -27,6 +27,11 @@ A new potential attack primitive was added to this tool during my research, see 
 
 ### Installation
 
+Now available on PyPi!
+
+`pipx install max-bh`
+
+#### Manual
 Ideally there shouldn't be much to install, but I've included a requirements.txt file just in case. Tested on Kali Linux & Windows 10, all functionality should work for both linux and Windows operating systems.
 
 `pip3 install -r requirements.txt`
@@ -37,16 +42,16 @@ Neo4j credentials can be hardcoded at the beginning of the script, they can be p
 
 ```bash
  export NEO4J_PASSWORD='bloodhound' # Notice whitespace before 'export'
-python3 max.py {module} {args}
+max {module} {args}
 
 ```
 
 ```
-python3 max.py -u neo4j -p neo4j {module} {args}
+max -u neo4j -p neo4j {module} {args}
 ```
 
 ```
-python3 max.py {module} {args}
+max {module} {args}
 Neo4j Username: neo4j
 Neo4j Password:
 ```
@@ -55,20 +60,20 @@ Neo4j Password:
 
 Getting help in general, and module specific
 ```
-python3 max.py -h
-python3 max.py {module} -h
+max -h
+max {module} -h
 ```
 
 Importing owned objects into BH
 ```
-python3 max.py mark-owned -f owned.txt
-python3 max.py mark-owned -f owned.txt --add-note "Owned by repeated local admin"
+max mark-owned -f owned.txt
+max mark-owned -f owned.txt --add-note "Owned by repeated local admin"
 ```
 
 Get list of users
 ```
-python3 max.py get-info --users
-python3 max.py get-info --users --enabled
+max get-info --users
+max get-info --users --enabled
 
 USER01@DOMAIN.LOCAL
 USER02@DOMAIN.LOCAL
@@ -77,43 +82,43 @@ USER02@DOMAIN.LOCAL
 
 Get list of objects in a target group
 ```
-python3 max.py get-info --group-members "domain controllers@domain.local"
+max get-info --group-members "domain controllers@domain.local"
 ```
 
 Get a list of computers that a user has administrative rights to
 ```
-python3 max.py get-info --adminto USER01@DOMAIN.LOCAL
+max get-info --adminto USER01@DOMAIN.LOCAL
 ```
 
 Get a list of owned objects with the notes for each
 ```
-python3 max.py get-info --owned --get-note
+max get-info --owned --get-note
 ```
 
 Running a query - return a list of all users with a path to DA
 ```
-python3 max.py query -q "MATCH (n:User),(m:Group {name:'DOMAIN ADMINS@DOMAIN.LOCAL'}) MATCH (n)-[*1..]->(m) RETURN DISTINCT(n.name)"
+max query -q "MATCH (n:User),(m:Group {name:'DOMAIN ADMINS@DOMAIN.LOCAL'}) MATCH (n)-[*1..]->(m) RETURN DISTINCT(n.name)"
 ```
 
 Delete an edge from the database
 ```
-python3 max.py del-edge CanRDP
+max del-edge CanRDP
 ```
 
 Add HasSPNConfigured relationship using the information stored within BloodHound, or with a GetUserSPNs impacket file
 ```
-python3 max.py add-spns -b
-python3 max.py add-spns -i getuserspns-raw-output.txt
+max add-spns -b
+max add-spns -i getuserspns-raw-output.txt
 ```
 
 DPAT
 ```
-python3 max.py dpat -n ~/client/ntds.dit -c ~/.hashcat/hashcat.potfile -o ouputdir --html --sanitize
+max dpat -n ~/client/ntds.dit -c ~/.hashcat/hashcat.potfile -o ouputdir --html --sanitize
 ```
 
 Pet max
 ```
-python3 max.py pet-max
+max pet-max
 ```
 
 #### Object Files & Specification
