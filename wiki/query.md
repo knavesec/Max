@@ -12,7 +12,7 @@ For the advanced BloodHound user, experience with Cypher queries required. Allow
 * `-q/--query` Should be used for a single query to run, returning the output to the command line
 * `-f/--file` Should be used for a file containing queries, one per line, meant for mass changes (no output returned per query)
 * `path` flag indicates the output is a full path
-* `d/delim` Is a flag where a new output delimeter can be set to separate outputs. Default is `output1 - output2` with the "-" being the changable delimeter. Doesn't apply to path outputs
+* `d/delim` Is a flag where a new output delimiter can be set to separate outputs. Default is `output1 - output2` with the "-" being the changeable delimiter. Doesn't apply to path outputs
 * Unlike other modules, the notes in "Object Files & Specification" do not all apply, any object name must include FQDN but also must be capitalized, just like any query run in the browser
 * Main benefit is not having to copy-paste out of the Neo4j browser console
 

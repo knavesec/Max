@@ -23,11 +23,13 @@ from itertools import zip_longest
 
 # option to hardcode URL & URI
 global_url = "http://127.0.0.1:7474"
-global_uri = "/db/data/transaction/commit"
+#global_uri = "/db/data/transaction/commit"
+global_uri = "/db/neo4j/tx/commit"
+
 
 # option to hardcode creds or put them in environment variables, these will be used as the username and password "defaults"
 global_username = 'neo4j' if (not os.environ.get('NEO4J_USERNAME', False)) else os.environ['NEO4J_USERNAME']
-global_password = 'bloodhound' if (not os.environ.get('NEO4J_PASSWORD', False)) else os.environ['NEO4J_PASSWORD'] 
+global_password = 'bloodhound' if (not os.environ.get('NEO4J_PASSWORD', False)) else os.environ['NEO4J_PASSWORD']
 
 def do_test(args):
 
@@ -59,6 +61,37 @@ def do_query(args, query, data_format=None):
         exit()
     else:
         return r
+
+
+def get_list_from_query(request):
+
+    x = json.loads(request.text)
+
+    entry_list = []
+    entry_list = []
+
+    try:
+        entry_list = x["results"][0]["data"]
+        col_len = len(x["results"][0]["columns"])
+    except:
+        print(x)
+        return []
+
+    if col_len == 0:
+        return []
+
+    ret = []
+    for entry in entry_list:
+        if col_len == 1:
+            ret.append(entry['row'][0])
+            continue
+
+        single_row = []
+        for i in range(0,col_len):
+            single_row.append(entry["row"][i])
+        ret.append(single_row)
+
+    return ret
 
 
 def get_query_output(entry,delimeter,cols_len=None,path=False):
@@ -184,7 +217,7 @@ def get_info(args):
             "columns" : ["ObjectName"]
         },
         "desc" : {
-            "query" : "MATCH (n) WHERE n.description IS NOT NULL RETURN n.name,n.description",
+            "query" : "MATCH (n) WHERE n.description IS NOT NULL and n.description<>'' RETURN n.name,n.description",
             "columns" : ["ObjectName","Description"]
         },
         "admincomps" : {
@@ -493,20 +526,56 @@ def export_func(args):
         "WriteOwner",
         "ReadLAPSPassword",
         "ReadGMSAPassword",
+        "AddKeyCredentialLink",
+        "WriteSPN",
+        "AddSelf",
+        "AddAllowedToAct",
+        "DCSync",
+        "SyncLAPSPassword",
         "Contains",
-        "GpLink",
+        "GPLink",
         "CanRDP",
         "CanPSRemote",
         "ExecuteDCOM",
         "AllowedToDelegate",
-        "AddAllowedToAct",
         "AllowedToAct",
         "SQLAdmin",
         "HasSIDHistory",
-        "HasSPNConfigured",
-        "SharesPasswordWith"
+
+        "AZAvereContributor",
+        "AZContains",
+        "AZContributor",
+        "AZGetCertificates",
+        "AZGetKeys",
+        "AZGetSecrets",
+        "AZHasRole",
+        "AZMemberOf",
+        "AZOwner",
+        "AZRunsAs",
+        "AZVMContributor",
+        "AZVMAdminLogin",
+        "AZAddMembers",
+        "AZAddSecret",
+        "AZExecuteCommand",
+        "AZGlobalAdmin",
+        "AZPrivilegedAuthAdmin",
+        "AZGrant",
+        "AZGrantSelf",
+        "AZPrivilegedRoleAdmin",
+        "AZResetPassword",
+        "AZUserAccessAdministrator",
+        "AZOwns",
+        "AZScopedTo",
+        "AZCloudAppAdmin",
+        "AZAppAdmin",
+        "AZAddOwner",
+        "AZManagedIdentity",
+        "AZKeyVaultContributor"
+  
+
     ]
 
+    # TODO handle azname input as well
     node_name = args.NODENAME.upper().strip()
     query = "MATCH (n1 {{name:'{node_name}'}}) MATCH (n1)-[r:{edge}]->(n2) RETURN DISTINCT n2.name"
 
@@ -959,7 +1028,7 @@ def dpat_func(args):
             "label" : "Accounts With Explicit Admin Rights Cracked"
         },
         {
-            "query" : "MATCH p2=(u:User {cracked:true})-[r1:MemberOf*1..]->(g:Group)-[r2:AdmintTo]->(n2) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
+            "query" : "MATCH p2=(u:User {cracked:true})-[r1:MemberOf*1..]->(g:Group)-[r2:AdminTo]->(n2) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
             "label" : "Accounts With Group Delegated Admin Rights Cracked"
         },
         {
@@ -969,7 +1038,15 @@ def dpat_func(args):
         {
             "query" : "MATCH p2=(u:User {cracked:true})-[r1:MemberOf*1..]->(g:Group)-[r2:AllExtendedRights|AddMember|ForceChangePassword|GenericAll|GenericWrite|Owns|WriteDacl|WriteOwner|ReadLAPSPassword|ReadGMSAPassword|CanRDP|CanPSRemote|ExecuteDCOM|AllowedToDelegate|AddAllowedToAct|AllowedToAct|SQLAdmin|HasSIDHistory]->(n2) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
             "label" : "Accounts With Group Delegated Controlling Privileges Cracked"
-        }
+        },
+        {
+            "query" : "MATCH p1=(u:User {cracked:true})-[r:AZAddMembers|AZAppAdmin|AZCloudAppAdmin|AZContains|AZContributor|AZGetCertificates|AZGetKeys|AZGetSecrets|AZGlobalAdmin|AZPrivilegedRoleAdmin|AZResetPassword|AZRunAs|AZUserAccessAdministrator]->(n1) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
+            "label" : "On-Prem Accounts With Azure AD Controlling Privileges Cracked"
+        },
+        {
+            "query" : "MATCH p2=(u:User {cracked:true})-[r1:MemberOf*1..]->(g:Group)-[r2:AZAddMembers|AZAppAdmin|AZCloudAppAdmin|AZContains|AZContributor|AZGetCertificates|AZGetKeys|AZGetSecrets|AZGlobalAdmin|AZPrivilegedRoleAdmin|AZResetPassword|AZRunAs|AZUserAccessAdministrator]->(n2) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
+            "label" : "On-Prem Accounts With Group Delegated Azure AD Controlling Privileges Cracked"
+        },
     ]
 
     if not args.less:
@@ -1221,7 +1298,7 @@ def dpat_func(args):
         print("[+] Marking cracked users as owned")
         own_cracked_query="MATCH (u:User {cracked:True}) SET u.owned=true"
         do_query(args,own_cracked_query)
-    
+
     # Add a note to users with cracked passwords indicating that they have been cracked
     if args.add_crack_note:
         print('[+] Adding notes to cracked users')
@@ -1446,6 +1523,223 @@ def dpat_func(args):
         print("")
 
 
+def ad_audit(args):
+
+# todo
+# most-controlled computers
+# any users with control over DCs
+# non DA/EA users with most privileges
+
+# da sessions
+# "dasess" : {
+#     "query" : "MATCH (u:User)-[r:MemberOf*1..]->(g:Group) WHERE g.objectid ENDS WITH '-512' WITH COLLECT(u) AS das MATCH (u2:User)<-[r2:HasSession]-(c:Computer) WHERE u2 IN das RETURN DISTINCT u2.name,c.name ORDER BY u2.name",
+#     "columns" : ["UserName","ComputerName"]
+# },
+
+    if args.gprivs:
+
+        query = "match (g:Group) return g.name"
+        r = do_query(args, query)
+        x = json.loads(r.text)
+
+        entry_list = x["results"][0]["data"]
+
+        groups = []
+        group_arr = [["Group Name", "Members", "Unrolled Members", "Outbound Privileges", "Total Privileges"]]
+
+        for entry in entry_list:
+            groups.append(get_query_output(entry,","))
+
+        for group in groups:
+
+            # Get group members
+            query = "match (g:Group {{name:\"{gname}\"}}) match p=(u)-[r:MemberOf]->(g) return count(distinct(p))".format(gname=group)
+            members = int(get_list_from_query(do_query(args, query))[0])
+
+            # Get unrolled group members
+            query = "match (g:Group {{name:\"{gname}\"}}) match p=(u)-[r:MemberOf*1..6]->(g) return count(distinct(p))".format(gname=group)
+            members_unrolled = int(get_list_from_query(do_query(args, query))[0])
+
+            # get direct controlling privs
+            query = "match (g:Group {{name:\"{gname}\"}}) match p=(g)-[r:HasSession|AdminTo|AllExtendedRights|AddMember|ForceChangePassword|GenericAll|GenericWrite|Owns|WriteDacl|WriteOwner|ReadLAPSPassword|ReadGMSAPassword|AddKeyCredentialLink|WriteSPN|AddSelf|AddAllowedToAct|DCSync|SyncLAPSPassword|Contains|GPLink|CanRDP|CanPSRemote|ExecuteDCOM|AllowedToDelegate|AllowedToAct|SQLAdmin|HasSIDHistory]->(n) return count(distinct(p))".format(gname=group)
+            privs = int(get_list_from_query(do_query(args, query))[0])
+
+            # total privs = number of total users * total amount of group delegated privileges
+            privs_total = privs * members_unrolled
+
+            group_arr.append([group, members, members_unrolled, privs, privs_total])
+
+
+        filename = "ADAUDIT_GPRIVS.csv"
+        with open(filename,'w', encoding='utf-8', newline='') as file:
+            wr = csv.writer(file)
+            wr.writerows(group_arr)
+        file.close()
+
+    elif args.uprivs:
+
+        query = "match (u:User) return u.name"
+        users = get_list_from_query(do_query(args, query))
+
+        user_arr = [["User Name", "Outbound Privileges", "Inbound Privileges"]]
+
+        for user in users:
+
+            # Get outbound privs
+            query = "match (u:User {{name:\"{uname}\"}}) match p=(u)-[r:HasSession|AdminTo|AllExtendedRights|AddMember|ForceChangePassword|GenericAll|GenericWrite|Owns|WriteDacl|WriteOwner|ReadLAPSPassword|ReadGMSAPassword|AddKeyCredentialLink|WriteSPN|AddSelf|AddAllowedToAct|DCSync|SyncLAPSPassword|Contains|GPLink|CanRDP|CanPSRemote|ExecuteDCOM|AllowedToDelegate|AllowedToAct|SQLAdmin|HasSIDHistory]->(g) return count(distinct(p))".format(uname=user)
+            privs_out = int(get_list_from_query(do_query(args, query))[0])
+
+            # Get outbound privs
+            query = "match (u:User {{name:\"{uname}\"}}) match p=(g)-[r:HasSession|AdminTo|AllExtendedRights|AddMember|ForceChangePassword|GenericAll|GenericWrite|Owns|WriteDacl|WriteOwner|ReadLAPSPassword|ReadGMSAPassword|AddKeyCredentialLink|WriteSPN|AddSelf|AddAllowedToAct|DCSync|SyncLAPSPassword|Contains|GPLink|CanRDP|CanPSRemote|ExecuteDCOM|AllowedToDelegate|AllowedToAct|SQLAdmin|HasSIDHistory]->(u) return count(distinct(p))".format(uname=user)
+            privs_in = int(get_list_from_query(do_query(args, query))[0])
+
+            user_arr.append([user, privs_out, privs_in])
+
+
+        filename = "ADAUDIT_UPRIVS.csv"
+        with open(filename,'w', encoding='utf-8', newline='') as file:
+            wr = csv.writer(file)
+            wr.writerows(user_arr)
+        file.close()
+
+    elif args.aadgprivs:
+
+        query = "match (g:AZGroup) return g.azname"
+        r = do_query(args, query)
+        x = json.loads(r.text)
+
+        entry_list = x["results"][0]["data"]
+
+        groups = []
+        group_arr = [["Group Name", "Members", "Unrolled Members", "Outbound Privileges", "Total Privileges"]]
+
+        for entry in entry_list:
+            groups.append(get_query_output(entry,","))
+
+        for group in groups:
+
+            # Get group members
+            query = "match (g:AZGroup {{azname:\"{azgname}\"}}) match p=(u)-[r:MemberOf]->(g) return count(distinct(p))".format(azgname=group)
+            members = int(get_list_from_query(do_query(args, query))[0])
+
+            # Get unrolled group members
+            query = "match (g:AZGroup {{azname:\"{azgname}\"}}) match p=(u)-[r:MemberOf*1..6]->(g) return count(distinct(p))".format(azgname=group)
+            members_unrolled = int(get_list_from_query(do_query(args, query))[0])
+
+            # get direct controlling privs
+            query = "match (g:AZGroup {{azname:\"{azgname}\"}}) match p=(g)-[r:AZAddMembers|AZContains|AZContributor|AZGetCertificates|AZGetKeys|AZGetSecrets|AZGlobalAdmin|AZOwns|AZPrivilegedRoleAdmin|AZResetPassword|AZUserAccessAdministrator|AZAppAdmin|AZCloudAppAdmin|AZRunsAs|AZKeyVaultContributor]->(n) return count(distinct(p))".format(azgname=group)
+            privs = int(get_list_from_query(do_query(args, query))[0])
+
+            # total privs = number of total users * total amount of group delegated privileges
+            privs_total = privs * members_unrolled
+
+            group_arr.append([group, members, members_unrolled, privs, privs_total])
+
+
+        filename = "AADAUDIT_GPRIVS.csv"
+        with open(filename,'w', encoding='utf-8', newline='') as file:
+            wr = csv.writer(file)
+            wr.writerows(group_arr)
+        file.close()
+
+    elif args.aaduprivs:
+
+        query = "match (u:AZUser) return u.azname"
+        users = get_list_from_query(do_query(args, query))
+
+        user_arr = [["User Name", "Outbound Privileges", "Inbound Privileges"]]
+
+        for user in users:
+
+            # Get outbound privs
+            query = "match (u:AZUser {{azname:\"{azuname}\"}}) match p=(u)-[r:AZAddMembers|AZContains|AZContributor|AZGetCertificates|AZGetKeys|AZGetSecrets|AZGlobalAdmin|AZOwns|AZPrivilegedRoleAdmin|AZResetPassword|AZUserAccessAdministrator|AZAppAdmin|AZCloudAppAdmin|AZRunsAs|AZKeyVaultContributor]->(g) return count(distinct(p))".format(azuname=user)
+            privs_out = int(get_list_from_query(do_query(args, query))[0])
+
+            # Get outbound privs
+            query = "match (u:AZUser {{azname:\"{azuname}\"}}) match p=(g)-[r:AZAddMembers|AZContains|AZContributor|AZGetCertificates|AZGetKeys|AZGetSecrets|AZGlobalAdmin|AZOwns|AZPrivilegedRoleAdmin|AZResetPassword|AZUserAccessAdministrator|AZAppAdmin|AZCloudAppAdmin|AZRunsAs|AZKeyVaultContributor]->(u) return count(distinct(p))".format(azuname=user)
+            privs_in = int(get_list_from_query(do_query(args, query))[0])
+
+            user_arr.append([user, privs_out, privs_in])
+
+
+        filename = "AADAUDIT_UPRIVS.csv"
+        with open(filename,'w', encoding='utf-8', newline='') as file:
+            wr = csv.writer(file)
+            wr.writerows(user_arr)
+        file.close()
+
+    elif args.fprivs:
+
+        query = "match (n) return n.objectid,n.name,n.azname,labels(n)"
+        node_label_list = ["Object ID", "Node Name", "Node Type", "Group Memberships", "Outbound Privileges", "Inbound Privileges", "Group Members", "Unrolled Group Members", "Total Group Privs", "Net Node Privileges"]
+        node_object_list = get_list_from_query(do_query(args, query))
+        print("Object lookups complete")
+
+        if len(node_label_list) == 1:
+            print("No nodes returned from query, populate Neo4j database")
+            return
+
+        filename = "AD_AUDIT_FULL_PRIVS.csv"
+        file = open(filename, "w", encoding='utf-8', newline='')
+
+        wr = csv.writer(file)
+        wr.writerow(node_label_list)
+
+        for i in range(0,len(node_object_list)):
+
+            print("Performing lookups for {nname} with ObjectID {objid}".format(nname=node_object_list[i][1], objid=node_object_list[i][0]))
+
+            nobjid = node_object_list[i][0]
+            nname = None
+            ntype = None
+
+            if node_object_list[i][1] != "None":
+                nname = node_object_list[i][1]
+            else:
+                nname = node_object_list[i][2]
+
+            if len(node_object_list[i][3]) == 1:
+                ntype = node_object_list[i][3][0]
+            else:
+                ntype = node_object_list[i][3][ node_object_list[i][3][0]=="Base" ]
+
+            if nname is not None and '\\' in nname:
+                nname = '\\\\'.join(nname.split('\\'))
+
+            query = "match (n:{type} {{objectid:\"{objid}\"}}) match p=(n)-[r]->(m) where not type(r)=~'MemberOf' return count(distinct(p))".format(type=ntype, objid=nobjid)
+            privs_out = int(get_list_from_query(do_query(args, query))[0])
+
+            query = "match (n:{type} {{objectid:\"{objid}\"}}) match p=(m)-[r]->(n) where not type(r)=~'MemberOf' return count(distinct(p))".format(type=ntype, objid=nobjid)
+            privs_in = int(get_list_from_query(do_query(args, query))[0])
+
+            query = "match (n:{type} {{objectid:\"{objid}\"}}) match p=(n)-[r:MemberOf]->(g) return count(distinct(p))".format(type=ntype, objid=nobjid)
+            memberships = int(get_list_from_query(do_query(args, query))[0])
+
+            members = ""
+            members_unrolled = ""
+            total_group_privs = ""
+
+            if ntype == "Group" or ntype == "AZGroup":
+
+                query = "match (n:{type} {{objectid:\"{objid}\"}}) match p=(m)-[r:MemberOf]->(n) return count(distinct(m))".format(type=ntype, objid=nobjid)
+                members = int(get_list_from_query(do_query(args, query))[0])
+
+                query = "match (n:{type} {{objectid:\"{objid}\"}}) match p=(m)-[r:MemberOf*1..10]->(n) return count(distinct(m))".format(type=ntype, objid=nobjid)
+                members_unrolled = int(get_list_from_query(do_query(args, query))[0])
+
+                total_group_privs = members_unrolled * privs_out
+
+            # [object ID, node name, node type, group memberships, outbound privs, inbound privs, group members, unrolled group members, total group privs, net privileges]
+            node_line_values = [nobjid, nname, ntype, memberships, privs_out, privs_in, members, members_unrolled, total_group_privs, "=IF(H{i}>0, I{i},E{i})".format(i=i+2)]
+
+            wr.writerow(node_line_values)
+
+
+        file.close()
+        print("Finished writing privileges sheet, saved to {}".format(filename))
+
+
+
 def pet_max():
 
     messages = [
@@ -1508,6 +1802,7 @@ def main():
     addspns = switch.add_parser("add-spns",help="Create 'HasSPNConfigured' relationships with targets from a file or stored BloodHound data. Adds possible path of compromise edge via cleartext service account credentials stored within LSA Secrets")
     addspw = switch.add_parser("add-spw",help="Create 'SharesPasswordWith' relationships with targets from a file. Adds edge indicating two objects share a password (repeated local administrator)")
     dpat = switch.add_parser("dpat",help="BloodHound Domain Password Audit Tool, run cracked user-password analysis tied with BloodHound through a Hashcat potfile & NTDS")
+    adaudit = switch.add_parser("ad-audit",help="AD Audit Tools")
     petmax = switch.add_parser("pet-max",help="Pet max, hes a good boy (pet me again, I say different things)")
 
     # GETINFO function parameters
@@ -1559,7 +1854,7 @@ def main():
     # MARKHVT function parameters
     markhvt.add_argument("-f","--file",dest="filename",default="",required=False,help="Filename containing AD objects (must have FQDN attached)")
     markhvt.add_argument("--add-note",dest="notes",default="",help="Notes to add to all marked objects (reason for HVT status)")
-    markhvt.add_argument("--clear",dest="clear",action="store_true",help="Remove HVT marker from all objects")
+    markhvt.add_argument("--clear",dest="clear",action="store_true",help="Remove HVT marker from all objects, warning removes from every object")
 
     # QUERY function arguments
     query.add_argument("-q", "--query", dest="query", default=None, help="Single query designation")
@@ -1600,10 +1895,16 @@ def main():
     dpat.add_argument("--own-cracked", dest="own_cracked", action="store_true", required=False, help="Mark all users with cracked passwords as owned")
     dpat.add_argument("--add-crack-note",dest="add_crack_note",action="store_true",required=False,help="Add a note to cracked users indicating they have been cracked")
 
+    # ADAUDIT function parameters
+    adaudit.add_argument("--gprivs",required=False,default=False,action="store_true",help="Create a CSV listing of Group Privileges")
+    adaudit.add_argument("--uprivs",required=False,default=False,action="store_true",help="Create a CSV listing of User Privileges")
+    adaudit.add_argument("--aadgprivs",required=False,default=False,action="store_true",help="Create a CSV listing of Azure AD Group Privileges")
+    adaudit.add_argument("--aaduprivs",required=False,default=False,action="store_true",help="Create a CSV listing of Azure AD User Privileges")
+    adaudit.add_argument("--fprivs",required=False,default=False,action="store_true",help="Create a CSV listing of Full Object Privileges, may take a while")
+
     args = parser.parse_args()
 
-
-    if not do_test(args):
+    if not args.command == "pet-max" and not do_test(args):
         print("Connection error: restart Neo4j console or verify the the following URL is available: {}".format(args.url))
         exit()
 
@@ -1640,6 +1941,8 @@ def main():
         add_spw(args)
     elif args.command == "dpat":
         dpat_func(args)
+    elif args.command == "ad-audit":
+        ad_audit(args)
     elif args.command == "pet-max":
         pet_max()
     # else:
