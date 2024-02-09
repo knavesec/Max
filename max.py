@@ -900,31 +900,31 @@ def dpat_func(args):
             "label" : "Enabled User Accounts Cracked"
         },
         {
-            'query' : "MATCH p=(u:User {cracked:true})-[r:MemberOf*1..]->(g:Group {highvalue:true}) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
+            'query' : "match p = (k:Group)<-[:MemberOf*1..]-(m) where k.highvalue = true WITH [ n in nodes(p) WHERE n:User] as ulist UNWIND (ulist) as u RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
             'label' : "High Value User Accounts Cracked"
         },
         {
-            'query' : "MATCH (g:Group) WHERE g.objectid ENDS WITH '-512' MATCH (u:User)-[r:MemberOf*1..]->(g) RETURN DISTINCT u.enabled,u.ntds_uname,u.nt_hash,u.password",
+            'query' : "match p = (n:Group)<-[:MemberOf*1..]-(m) where n.objectid =~ '(?i)S-1-5-.*-512' with [ n IN nodes(p) WHERE n:User] as dalist unwind (dalist) as u RETURN DISTINCT u.enabled,u.ntds_uname,u.nt_hash,u.password",
             'label' : "Domain Admin Members"
         },
         {
-            'query' : "MATCH (g:Group) WHERE g.objectid ENDS WITH '-512' MATCH (u:User {cracked:true})-[r:MemberOf*1..]->(g) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
+            'query' : "match p = (n:Group)<-[:MemberOf*1..]-(m) where n.objectid =~ '(?i)S-1-5-.*-512' with [ n IN nodes(p) WHERE n:User] as dalist unwind (dalist) as u MATCH (u {cracked:true}) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
             'label' : "Domain Admin Members Cracked"
         },
         {
-            'query' : "MATCH (g:Group) WHERE g.objectid ENDS WITH '-519' MATCH (u:User)-[r:MemberOf*1..]->(g) RETURN DISTINCT u.enabled,u.ntds_uname,u.nt_hash,u.password",
+            'query' : "match p = (n:Group)<-[:MemberOf*1..]-(m) where n.objectid =~ '(?i)S-1-5-.*-519' with [ n IN nodes(p) WHERE n:User] as dalist unwind (dalist) as u RETURN DISTINCT u.enabled,u.ntds_uname,u.nt_hash,u.password",
             'label' : "Enterprise Admin Members"
         },
         {
-            'query' : "MATCH (g:Group) WHERE g.objectid ENDS WITH '-519' MATCH (u:User {cracked:true})-[r:MemberOf*1..]->(g) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
+            'query' : "match p = (n:Group)<-[:MemberOf*1..]-(m) where n.objectid =~ '(?i)S-1-5-.*-519' with [ n IN nodes(p) WHERE n:User] as dalist unwind (dalist) as u MATCH (u {cracked:true}) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
             'label' : "Enterprise Admin Accounts Cracked"
         },
         {
-            'query' : "MATCH (g:Group) WHERE g.objectid ENDS WITH '-544' MATCH (u:User)-[r:MemberOf]->(g) RETURN DISTINCT u.enabled,u.ntds_uname,u.nt_hash,u.password",
+            'query' : "match p = (n:Group)<-[:MemberOf*1..]-(m) where n.objectid =~ '(?i)S-1-5-.*-544' with [ n IN nodes(p) WHERE n:User] as dalist unwind (dalist) as u RETURN DISTINCT u.enabled,u.ntds_uname,u.nt_hash,u.password",
             'label' : "Administrator Group Members"
         },
         {
-            'query' : "MATCH (g:Group) WHERE g.objectid ENDS WITH '-544' MATCH (u:User {cracked:true})-[r:MemberOf]->(g) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
+            'query' : "match p = (n:Group)<-[:MemberOf*1..]-(m) where n.objectid =~ '(?i)S-1-5-.*-544' with [ n IN nodes(p) WHERE n:User] as dalist unwind (dalist) as u MATCH (u {cracked:true}) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
             'label' : "Administrator Group Member Accounts Cracked"
         },
         {
