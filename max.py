@@ -955,11 +955,11 @@ def dpat_func(args):
 
     intense_queries = [
         {
-            "query" : "match k = (n:Group)<-[:MemberOf*1..]-(m) where n.objectid ENDS WITH '-516' AND NOT (n = m) with [c in nodes(k) WHERE c:Computer] as dcs match p = shortestPath((n)-[:HasSession|AdminTo|Contains|AZLogicAppContributor*1..]->(m {unconstraineddelegation: true})) where not (n = m) AND NOT ( m IN dcs ) with [ n IN nodes(p) WHERE n:User] as ulist UNWIND ulist as u MATCH (u {cracked:true}) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash,n.name",
+            "query" : "match k = (n:Group)<-[:MemberOf*1..]-(m) where n.objectid ENDS WITH '-516' AND NOT (n = m) with [c in nodes(k) WHERE c:Computer] as dcs match p = shortestPath((n)-[:HasSession|AdminTo|Contains|AZLogicAppContributor*1..]->(m {unconstraineddelegation: true})) where not (n = m) AND NOT ( m IN dcs ) with [ n IN nodes(p) WHERE n:User] as ulist UNWIND ulist as u MATCH (u {cracked:true}) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
             "label" : "Accounts With Paths To Unconstrained Delegation Objects Cracked (Excluding DCs)"
         },
         {
-            "query" : "MATCH (u:User {cracked:true}),(n {highvalue:true}),p=shortestPath((u)-[r*1..]->(n)) WHERE NONE (r IN relationships(p) WHERE type(r)= 'GetChanges') AND NONE (r in relationships(p) WHERE type(r)='GetChangesAll') AND NOT u=n RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
+            "query" : "match p = shortestPath((u)-[*1..]->(n)) where n.highvalue = true AND u <> n WITH [n in nodes(p) WHERE n:User] as ulist UNWIND(ulist) as u MATCH (u {cracked:true}) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
             "label" : "Accounts With Paths To High Value Targets Cracked"
         },
         {
@@ -975,7 +975,7 @@ def dpat_func(args):
             "label" : "Accounts With Explicit Controlling Privileges Cracked"
         },
         {
-            "query" : "MATCH p2=(u:User {cracked:true})-[r1:MemberOf*1..]->(g:Group)-[r2:AllExtendedRights|AddMember|ForceChangePassword|GenericAll|GenericWrite|Owns|WriteDacl|WriteOwner|ReadLAPSPassword|ReadGMSAPassword|CanRDP|CanPSRemote|ExecuteDCOM|AllowedToDelegate|AddAllowedToAct|AllowedToAct|SQLAdmin|HasSIDHistory]->(n2) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
+            "query" : "MATCH p2=(n)-[r1:MemberOf*1..]->(g:Group)-[r2:AllExtendedRights|AddMember|ForceChangePassword|GenericAll|GenericWrite|Owns|WriteDacl|WriteOwner|ReadLAPSPassword|ReadGMSAPassword|CanRDP|CanPSRemote|ExecuteDCOM|AllowedToDelegate|AddAllowedToAct|AllowedToAct|SQLAdmin|HasSIDHistory]->(n2) WITH [u in nodes(p2) WHERE u:User] AS ulist UNWIND(ulist) AS u MATCH (u {cracked:true}) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
             "label" : "Accounts With Group Delegated Controlling Privileges Cracked"
         }
     ]
@@ -1010,7 +1010,7 @@ def dpat_func(args):
     import time
     for search_value in queries:
 
-        # start = time.time()
+        start = time.time()
 
         query = search_value['query']
         label = search_value['label']
@@ -1023,8 +1023,8 @@ def dpat_func(args):
 
         r = do_query(args,query)
         resp = json.loads(r.text)['results'][0]['data']
-        # end = time.time()
-        # print("[*] Done in {} seconds".format(end-start))
+        end = time.time()
+        print("[*] Done in {} seconds".format(end-start))
         for entry in resp:
             query_counts[label] += 1 # TODO
             status_flag = "disabled"
