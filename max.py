@@ -955,7 +955,7 @@ def dpat_func(args):
 
     intense_queries = [
         {
-            "query" : "MATCH (g:Group) WHERE g.objectid ENDS WITH '-516' MATCH (c:Computer)-[MemberOf]->(g) WITH COLLECT(c) AS dcs MATCH (u:User {cracked:true}),(n {unconstraineddelegation:true}),p=shortestPath((u)-[r*1..]->(n)) WHERE NOT n IN dcs AND NONE (r IN relationships(p) WHERE type(r)= 'GetChanges') AND NONE (r in relationships(p) WHERE type(r)='GetChangesAll') AND NOT u=n RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash,n.name",
+            "query" : "match k = (n:Group)<-[:MemberOf*1..]-(m) where n.objectid ENDS WITH '-516' AND NOT (n = m) with [c in nodes(k) WHERE c:Computer] as dcs match p = shortestPath((n)-[:HasSession|AdminTo|Contains|AZLogicAppContributor*1..]->(m {unconstraineddelegation: true})) where not (n = m) AND NOT ( m IN dcs ) with [ n IN nodes(p) WHERE n:User] as ulist UNWIND ulist as u MATCH (u {cracked:true}) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash,n.name",
             "label" : "Accounts With Paths To Unconstrained Delegation Objects Cracked (Excluding DCs)"
         },
         {
