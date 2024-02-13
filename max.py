@@ -1010,7 +1010,7 @@ def dpat_func(args):
     import time
     for search_value in queries:
 
-        start = time.time()
+        # start = time.time()
 
         query = search_value['query']
         label = search_value['label']
@@ -1023,8 +1023,8 @@ def dpat_func(args):
 
         r = do_query(args,query)
         resp = json.loads(r.text)['results'][0]['data']
-        end = time.time()
-        print("[*] Done in {} seconds".format(end-start))
+        # end = time.time()
+        # print("[*] Done in {} seconds".format(end-start))
         for entry in resp:
             query_counts[label] += 1 # TODO
             status_flag = "disabled"
