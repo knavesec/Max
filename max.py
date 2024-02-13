@@ -900,31 +900,31 @@ def dpat_func(args):
             "label" : "Enabled User Accounts Cracked"
         },
         {
-            'query' : "MATCH p=(u:User {cracked:true})-[r:MemberOf*1..]->(g:Group {highvalue:true}) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
+            'query' : "match p = (k:Group)<-[:MemberOf*1..]-(m) where k.highvalue = true WITH [ n in nodes(p) WHERE n:User] as ulist UNWIND (ulist) as u RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
             'label' : "High Value User Accounts Cracked"
         },
         {
-            'query' : "MATCH (g:Group) WHERE g.objectid ENDS WITH '-512' MATCH (u:User)-[r:MemberOf*1..]->(g) RETURN DISTINCT u.enabled,u.ntds_uname,u.nt_hash,u.password",
+            'query' : "match p = (n:Group)<-[:MemberOf*1..]-(m) where n.objectid =~ '(?i)S-1-5-.*-512' with [ n IN nodes(p) WHERE n:User] as dalist unwind (dalist) as u RETURN DISTINCT u.enabled,u.ntds_uname,u.nt_hash,u.password",
             'label' : "Domain Admin Members"
         },
         {
-            'query' : "MATCH (g:Group) WHERE g.objectid ENDS WITH '-512' MATCH (u:User {cracked:true})-[r:MemberOf*1..]->(g) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
+            'query' : "match p = (n:Group)<-[:MemberOf*1..]-(m) where n.objectid =~ '(?i)S-1-5-.*-512' with [ n IN nodes(p) WHERE n:User] as dalist unwind (dalist) as u MATCH (u {cracked:true}) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
             'label' : "Domain Admin Members Cracked"
         },
         {
-            'query' : "MATCH (g:Group) WHERE g.objectid ENDS WITH '-519' MATCH (u:User)-[r:MemberOf*1..]->(g) RETURN DISTINCT u.enabled,u.ntds_uname,u.nt_hash,u.password",
+            'query' : "match p = (n:Group)<-[:MemberOf*1..]-(m) where n.objectid =~ '(?i)S-1-5-.*-519' with [ n IN nodes(p) WHERE n:User] as dalist unwind (dalist) as u RETURN DISTINCT u.enabled,u.ntds_uname,u.nt_hash,u.password",
             'label' : "Enterprise Admin Members"
         },
         {
-            'query' : "MATCH (g:Group) WHERE g.objectid ENDS WITH '-519' MATCH (u:User {cracked:true})-[r:MemberOf*1..]->(g) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
+            'query' : "match p = (n:Group)<-[:MemberOf*1..]-(m) where n.objectid =~ '(?i)S-1-5-.*-519' with [ n IN nodes(p) WHERE n:User] as dalist unwind (dalist) as u MATCH (u {cracked:true}) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
             'label' : "Enterprise Admin Accounts Cracked"
         },
         {
-            'query' : "MATCH (g:Group) WHERE g.objectid ENDS WITH '-544' MATCH (u:User)-[r:MemberOf]->(g) RETURN DISTINCT u.enabled,u.ntds_uname,u.nt_hash,u.password",
+            'query' : "match p = (n:Group)<-[:MemberOf*1..]-(m) where n.objectid =~ '(?i)S-1-5-.*-544' with [ n IN nodes(p) WHERE n:User] as dalist unwind (dalist) as u RETURN DISTINCT u.enabled,u.ntds_uname,u.nt_hash,u.password",
             'label' : "Administrator Group Members"
         },
         {
-            'query' : "MATCH (g:Group) WHERE g.objectid ENDS WITH '-544' MATCH (u:User {cracked:true})-[r:MemberOf]->(g) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
+            'query' : "match p = (n:Group)<-[:MemberOf*1..]-(m) where n.objectid =~ '(?i)S-1-5-.*-544' with [ n IN nodes(p) WHERE n:User] as dalist unwind (dalist) as u MATCH (u {cracked:true}) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
             'label' : "Administrator Group Member Accounts Cracked"
         },
         {
@@ -955,11 +955,11 @@ def dpat_func(args):
 
     intense_queries = [
         {
-            "query" : "MATCH (g:Group) WHERE g.objectid ENDS WITH '-516' MATCH (c:Computer)-[MemberOf]->(g) WITH COLLECT(c) AS dcs MATCH (u:User {cracked:true}),(n {unconstraineddelegation:true}),p=shortestPath((u)-[r*1..]->(n)) WHERE NOT n IN dcs AND NONE (r IN relationships(p) WHERE type(r)= 'GetChanges') AND NONE (r in relationships(p) WHERE type(r)='GetChangesAll') AND NOT u=n RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash,n.name",
+            "query" : "match k = (n:Group)<-[:MemberOf*1..]-(m) where n.objectid ENDS WITH '-516' AND NOT (n = m) with [c in nodes(k) WHERE c:Computer] as dcs match p = shortestPath((n)-[:HasSession|AdminTo|Contains|AZLogicAppContributor*1..]->(m {unconstraineddelegation: true})) where not (n = m) AND NOT ( m IN dcs ) with [ n IN nodes(p) WHERE n:User] as ulist UNWIND ulist as u MATCH (u {cracked:true}) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
             "label" : "Accounts With Paths To Unconstrained Delegation Objects Cracked (Excluding DCs)"
         },
         {
-            "query" : "MATCH (u:User {cracked:true}),(n {highvalue:true}),p=shortestPath((u)-[r*1..]->(n)) WHERE NONE (r IN relationships(p) WHERE type(r)= 'GetChanges') AND NONE (r in relationships(p) WHERE type(r)='GetChangesAll') AND NOT u=n RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
+            "query" : "match p = shortestPath((u)-[*1..]->(n)) where n.highvalue = true AND u <> n WITH [n in nodes(p) WHERE n:User] as ulist UNWIND(ulist) as u MATCH (u {cracked:true}) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
             "label" : "Accounts With Paths To High Value Targets Cracked"
         },
         {
@@ -975,7 +975,7 @@ def dpat_func(args):
             "label" : "Accounts With Explicit Controlling Privileges Cracked"
         },
         {
-            "query" : "MATCH p2=(u:User {cracked:true})-[r1:MemberOf*1..]->(g:Group)-[r2:AllExtendedRights|AddMember|ForceChangePassword|GenericAll|GenericWrite|Owns|WriteDacl|WriteOwner|ReadLAPSPassword|ReadGMSAPassword|CanRDP|CanPSRemote|ExecuteDCOM|AllowedToDelegate|AddAllowedToAct|AllowedToAct|SQLAdmin|HasSIDHistory]->(n2) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
+            "query" : "MATCH p2=(n)-[r1:MemberOf*1..]->(g:Group)-[r2:AllExtendedRights|AddMember|ForceChangePassword|GenericAll|GenericWrite|Owns|WriteDacl|WriteOwner|ReadLAPSPassword|ReadGMSAPassword|CanRDP|CanPSRemote|ExecuteDCOM|AllowedToDelegate|AddAllowedToAct|AllowedToAct|SQLAdmin|HasSIDHistory]->(n2) WITH [u in nodes(p2) WHERE u:User] AS ulist UNWIND(ulist) AS u MATCH (u {cracked:true}) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
             "label" : "Accounts With Group Delegated Controlling Privileges Cracked"
         }
     ]
