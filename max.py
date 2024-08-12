@@ -26,7 +26,7 @@ global_uri = "/db/neo4j/tx/commit" if (not os.environ.get('NEO4J_URI', False)) e
 
 # option to hardcode creds or put them in environment variables, these will be used as the username and password "defaults"
 global_username = 'neo4j' if (not os.environ.get('NEO4J_USERNAME', False)) else os.environ['NEO4J_USERNAME']
-global_password = 'bloodhound' if (not os.environ.get('NEO4J_PASSWORD', False)) else os.environ['NEO4J_PASSWORD'] 
+global_password = 'neo4jneo4j' if (not os.environ.get('NEO4J_PASSWORD', False)) else os.environ['NEO4J_PASSWORD'] 
 
 def do_test(args):
 
@@ -103,6 +103,101 @@ def get_query_output(entry,delimeter,cols_len=None,path=False):
                 pass
             else:
                 return " {} ".format(delimeter).join(map(str,entry["row"]))
+
+def get_adcs(args):
+    queries = {
+    "adcs-CAs": {
+        "query": "MATCH (n:GPO) WHERE n.type = 'Enrollment Service' RETURN n",
+        "columns": ["CertAuthorities"]
+    },
+    "adcs-enabled-certs": {
+        "query": "MATCH (n:GPO) WHERE n.type = 'Certificate Template' and n.Enabled = true RETURN n",
+        "columns": ["EnabledCertTemplates"]
+    },
+    "adcs-all-certs": {
+        "query": "MATCH (n:GPO) WHERE n.type = 'Certificate Template' RETURN n",
+        "columns": ["AllCertTemplates"]
+    },
+    "adcs-enrollment-rights": {
+        "query": "MATCH p=(g)-[:Enroll|AutoEnroll]->(n:GPO {name:$result}) WHERE n.type = 'Certificate Template' return p",
+        "columns": ["EnrollmentRights"]
+    },
+    "adcs-rights-ca": {
+        "query": "MATCH p=(g)-[:ManageCa|ManageCertificates|Auditor|Operator|Read|Enroll]->(n:GPO {name:$result}) return p",
+        "columns": ["CaRights"]
+    },
+    "adcs-misconfigured-certs-esc1": {
+        "query": "MATCH (n:GPO) WHERE n.type = 'Certificate Template' and n.`Enrollee Supplies Subject` = true and n.`Client Authentication` = true and n.`Enabled` = true  RETURN n",
+        "columns": ["MisconfiguredCertsESC1"]
+    },
+    "adcs-shortest-paths-esc1": {
+        "query": "MATCH p=allShortestPaths((g {owned:true})-[*1..]->(n:GPO)) WHERE  g<>n and n.type = 'Certificate Template' and n.`Enrollee Supplies Subject` = true and n.`Client Authentication` = true and n.`Enabled` = true return p",
+        "columns": ["ShortestPathsESC1"]
+    },
+    "adcs-misconfigured-certs-esc2": {
+        "query": "MATCH (n:GPO) WHERE n.type = 'Certificate Template' and n.`Enabled` = true and (n.`Extended Key Usage` = [] or 'Any Purpose' IN n.`Extended Key Usage` or n.`Any Purpose` = True) RETURN n",
+        "columns": ["MisconfiguredCertsESC2"]
+    },
+    "adcs-shortest-paths-esc2": {
+        "query": "MATCH p=allShortestPaths((g {owned:true})-[*1..]->(n:GPO)) WHERE  g<>n and n.type = 'Certificate Template' and n.`Enabled` = true and (n.`Extended Key Usage` = [] or 'Any Purpose' IN n.`Extended Key Usage` or n.`Any Purpose` = True) RETURN p",
+        "columns": ["ShortestPathsESC2"]
+    },
+    "adcs-enrollment-agent-esc3": {
+        "query": "MATCH (n:GPO) WHERE n.type = 'Certificate Template' and n.`Enabled` = true and (n.`Extended Key Usage` = [] or 'Any Purpose' IN n.`Extended Key Usage` or 'Certificate Request Agent' IN n.`Extended Key Usage` or n.`Any Purpose` = True) RETURN n",
+        "columns": ["EnrollmentAgentESC3"]
+    },
+    "adcs-shortest-paths-esc3": {
+        "query": "MATCH p=allShortestPaths((g {owned:true})-[*1..]->(n:GPO)) WHERE  g<>n and n.type = 'Certificate Template' and n.`Enabled` = true and (n.`Extended Key Usage` = [] or 'Any Purpose' IN n.`Extended Key Usage` or n.`Any Purpose` = True or 'Certificate Request Agent' IN n.`Extended Key Usage`) RETURN p",
+        "columns": ["ShortestPathsESC3"]
+    },
+    "adcs-shortest-paths-access-control-esc4": {
+        "query": "MATCH p=shortestPath((g)-[:GenericAll|GenericWrite|Owns|WriteDacl|WriteOwner*1..]->(n:GPO)) WHERE  g<>n and n.type = 'Certificate Template' and n.`Enabled` = true RETURN p",
+        "columns": ["ShortestPathsAccessControlESC4"]
+    },
+    "adcs-shortest-paths-access-control-owned-esc4": {
+        "query": "MATCH p=allShortestPaths((g {owned:true})-[r*1..]->(n:GPO)) WHERE g<>n and n.type = 'Certificate Template' and n.Enabled = true and NONE(x in relationships(p) WHERE type(x) = 'Enroll' or type(x) = 'AutoEnroll') return p",
+        "columns": ["ShortestPathsAccessControlOwnedESC4"]
+    },
+    "adcs-cas-user-specified-san-esc6": {
+        "query": "MATCH (n:GPO) WHERE n.type = 'Enrollment Service' and n.`User Specified SAN` = 'Enabled' RETURN n",
+        "columns": ["CASUserSpecifiedSANESC6"]
+    },
+    "adcs-shortest-paths-ca-access-control-esc7": {
+        "query": "MATCH p=shortestPath((g)-[r:GenericAll|GenericWrite|Owns|WriteDacl|WriteOwner|ManageCa|ManageCertificates*1..]->(n:GPO)) WHERE  g<>n and n.type = 'Enrollment Service' RETURN p",
+        "columns": ["ShortestPathsCAAccessControlESC7"]
+    },
+    "adcs-shortest-paths-ca-access-control-owned-esc7": {
+        "query": "MATCH p=allShortestPaths((g {owned:true})-[*1..]->(n:GPO)) WHERE  g<>n and n.type = 'Enrollment Service' and NONE(x in relationships(p) WHERE type(x) = 'Enroll' or type(x) = 'AutoEnroll') RETURN p",
+        "columns": ["ShortestPathsCAAccessControlOwnedESC7"]
+    },
+    "adcs-cas-web-enrollment-esc8": {
+        "query": "MATCH (n:GPO) WHERE n.type = 'Enrollment Service' and n.`Web Enrollment` = 'Enabled' RETURN n",
+        "columns": ["CASWebEnrollmentESC8"]
+    },
+    "adcs-unsecured-certs-esc9": {
+        "query": "MATCH (n:GPO) WHERE n.type = 'Certificate Template' and n.`Enrollee Supplies Subject` = true and n.`Client Authentication` = true and n.`Enabled` = true  RETURN n",
+        "columns": ["UnsecuredCertsESC9"]
+    },
+    "adcs-unsecured-certs-pki-esc9": {
+        "query": "MATCH (n:GPO) WHERE n.type = 'Certificate Template' and 'NoSecurityExtension' in n.`Enrollment Flag` and n.`Enabled` = true  RETURN n",
+        "columns": ["UnsecuredCertsPKIESC9"]
+    },
+    "adcs-shortest-paths-unsecured-certs-esc9": {
+        "query": "MATCH p=allShortestPaths((g {owned:true})-[r*1..]->(n:GPO)) WHERE n.type = 'Certificate Template' and g<>n and 'NoSecurityExtension' in n.`Enrollment Flag` and n.`Enabled` = true and NONE(rel in r WHERE type(rel) in ['EnabledBy','Read','ManageCa','ManageCertificates']) return p",
+        "columns": ["ShortestPathsUnsecuredCertsESC9"]
+    }
+    }
+
+    query = ""
+    cols = []
+    data_format = "row"
+    if args.adcs in get_adcs(queries):
+            query = queries[args.adcs]["query"]
+            cols = queries[args.adcs]["columns"]
+            run_predefined_queries({ args.adcs: { "query": query, "columns": cols } })
+    else:
+            print(f"Error: Invalid AD CS query name '{args.adcs}' provided.")
+
 
 
 def get_info(args):
@@ -354,7 +449,6 @@ def get_info(args):
         query = queries["ownedpaths"]["query"]
         cols = queries["ownedpaths"]["columns"]
         data_format = "graph"
-
     if args.getnote:
         query = query + ",n.notes"
         cols.append("Notes")
@@ -1469,6 +1563,7 @@ def pet_max():
         "10/10 would pet - @blurbdust",
         "dogsay > cowsay - @b1gbroth3r",
         "much query, very sniff - @vexance"
+        "bork - @ajm4n"
     ]
 
     max = """
@@ -1555,6 +1650,10 @@ def main():
     getinfo_switch.add_argument("--hvt-paths",dest="hvtpaths",default="",help="Return all paths from the input node to HVTs")
     getinfo_switch.add_argument("--owned-paths",dest="ownedpaths",default=False,action="store_true",help="Return all paths from owned objects to HVTs")
     getinfo_switch.add_argument("--owned-admins", dest="ownedadmins",default=False,action="store_true",help="Return all computers owned users are admins to")
+    
+    #ADCS function params
+    parser.add_argument('--adcs', help='Specify the AD CS query to run (adcs-CAs, adcs-enabled-certs, adcs-all-certs, adcs-enrollment-rights, adcs-rights-ca, adcs-misconfigured-certs-esc1, adcs-shortest-paths-esc1, adcs-misconfigured-certs-esc2, adcs-shortest-paths-esc2, adcs-enrollment-agent-esc3, adcs-shortest-paths-esc3, adcs-shortest-paths-access-control-esc4, adcs-shortest-paths-access-control-owned-esc4, adcs-cas-user-specified-san-esc6, adcs-shortest-paths-ca-access-control-esc7, adcs-shortest-paths-ca-access-control-owned-esc7, adcs-cas-web-enrollment-esc8, adcs-unsecured-certs-esc9, adcs-unsecured-certs-pki-esc9, adcs-shortest-paths-unsecured-certs-esc9.)', required=False, default="")
+
 
     getinfo.add_argument("--get-note",dest="getnote",default=False,action="store_true",help="Optional, return the \"notes\" attribute for whatever objects are returned")
     getinfo.add_argument("-l",dest="label",action="store_true",default=False,help="Optional, apply labels to the columns returned")
@@ -1653,6 +1752,8 @@ def main():
         dpat_func(args)
     elif args.command == "pet-max":
         pet_max()
+    elif args.command == "adcs":
+        adcs(args)
     # else:
     #     print("Error: use a module or use -h/--help to see help")
 
