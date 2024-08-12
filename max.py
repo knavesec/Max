@@ -1562,8 +1562,8 @@ def pet_max():
         "Hack the planet!",
         "10/10 would pet - @blurbdust",
         "dogsay > cowsay - @b1gbroth3r",
-        "much query, very sniff - @vexance"
-        "bork - @ajm4n"
+        "much query, very sniff - @vexance",
+        "bork lmao - @ajm4n"
     ]
 
     max = """
