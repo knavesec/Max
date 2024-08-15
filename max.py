@@ -210,7 +210,7 @@ def get_info(args):
             "columns" : ["ObjectName","SID","DomainName","ForeignObjectName"]
         },
         "unsupos" : {
-            "query" : "MATCH (c:Computer) WHERE c.operatingsystem =~ '.*(2000|2003|2008|xp|vista| 7 |me).*' RETURN c.name,c.operatingsystem",
+            "query" : "MATCH (c:Computer) WHERE toLower(c.operatingsystem) =~ '.*(2000|2003|2008|xp|vista| 7 |me).*' RETURN c.name,c.operatingsystem",
             "columns" : ["ComputerName","OperatingSystem"]
         },
         "foreignprivs" : {
