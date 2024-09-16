@@ -509,7 +509,46 @@ def run_adcs(args):
             """,
             "columns": ["Path"],
             "data_format": "graph"
-        }
+        },
+        "cas": {
+            "query": """
+            MATCH (n:GPO) WHERE n.type = 'Enrollment Service' RETURN n.name AS CAName
+            """,
+            "columns": ["CAName"],
+        },
+        "templates": {
+            "query": """
+            MATCH (n:GPO) WHERE n.type = 'Certificate Template' and n.Enabled = true RETURN n.name AS TemplateName
+            """,
+            "columns": ["TemplateName"],
+        },
+        "esc1_owned_path": {
+            "query": """
+            MATCH (u:User {owned: true})-[:MemberOf*0..]->(principal)
+            MATCH (principal)-[:Enroll|AutoEnroll]->(t:GPO {type: 'Certificate Template'})
+            WHERE
+              t.`Enrollee Supplies Subject` = true AND
+              t.`Client Authentication` = true AND
+              t.Enabled = true
+            RETURN DISTINCT
+              t.name AS TemplateName,
+              t.description AS TemplateDescription
+            ORDER BY TemplateName
+            """,
+            "columns": ["TemplateName", "TemplateDescription"]
+        },
+        "enrollment_rights": {
+            "query": """
+            MATCH (principal)-[r:Enroll|AutoEnroll]->(template:GPO {type: 'Certificate Template'})
+            RETURN
+              template.name AS TemplateName,
+              labels(principal) AS PrincipalLabels,
+              principal.name AS PrincipalName,
+              type(r) AS EnrollmentRight
+            ORDER BY TemplateName, PrincipalName
+            """,
+            "columns": ["TemplateName", "PrincipalLabels", "PrincipalName", "EnrollmentRight"]
+        },
     }
 
     # Determine which query to execute based on args
@@ -537,8 +576,16 @@ def run_adcs(args):
         selected_query = queries["esc9"]
     elif args.esc9_owned_path:
         selected_query = queries["esc9_owned_path"]
+    elif args.cas:
+        selected_query = queries["cas"]
+    elif args.templates:
+        selected_query = queries["templates"]
+    elif args.esc1_owned_path:
+        selected_query = queries["esc1_owned_path"]
+    elif args.enrollment_rights:
+        selected_query = queries["enrollment_rights"]
     else:
-        print("No valid ESC option selected.")
+        print("No valid ADCS option selected.")
         return
 
     query = selected_query["query"]
@@ -1751,6 +1798,7 @@ def main():
     adcs_parser = switch.add_parser("adcs", help="Run AD CS ESC attack detection queries")
     adcs_switch = adcs_parser.add_mutually_exclusive_group(required=True)
     adcs_switch.add_argument("--esc1", dest="esc1", default=False, action="store_true", help="Find Misconfigured Certificate Templates (ESC1)")
+    adcs_switch.add_argument("--esc1-owned-path", dest="esc1_owned_path", default=False, action="store_true", help="Find Misconfigured Certificate Templates (ESC1) from Owned Principals")
     adcs_switch.add_argument("--esc2", dest="esc2", default=False, action="store_true", help="Find Misconfigured Certificate Templates (ESC2)")
     adcs_switch.add_argument("--esc3", dest="esc3", default=False, action="store_true", help="Find Enrollment Agent Templates (ESC3)")
     adcs_switch.add_argument("--esc4-path", dest="esc4_path", default=False, action="store_true", help="Shortest Paths to Vulnerable Certificate Template Access Control (ESC4)")
@@ -1761,6 +1809,9 @@ def main():
     adcs_switch.add_argument("--esc8", dest="esc8", default=False, action="store_true", help="Find Certificate Authorities with HTTP Web Enrollment (ESC8)")
     adcs_switch.add_argument("--esc9", dest="esc9", default=False, action="store_true", help="Find Unsecured Certificate Templates (ESC9)")
     adcs_switch.add_argument("--esc9-owned-path", dest="esc9_owned_path", default=False, action="store_true", help="Shortest Paths to Unsecured Certificate Templates from Owned Principals (ESC9)")
+    adcs_switch.add_argument("--cas", dest="cas", default=False, action="store_true", help="List all Certificate Authorities")
+    adcs_switch.add_argument("--templates", dest="templates", default=False, action="store_true", help="List all enabled Certificate Templates")
+    adcs_switch.add_argument("--enrollment-rights", dest="enrollment_rights", default=False, action="store_true", help="List enrollment rights for all Certificate Templates")
 
     adcs_parser.add_argument("--get-note", dest="getnote", default=False, action="store_true", help="Optional, return the 'notes' attribute for whatever objects are returned")
     adcs_parser.add_argument("-l", dest="label", action="store_true", default=False, help="Optional, apply labels to the columns returned")
