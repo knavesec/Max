@@ -549,6 +549,38 @@ def run_adcs(args):
             """,
             "columns": ["TemplateName", "PrincipalLabels", "PrincipalName", "EnrollmentRight"]
         },
+        "vulnerable_templates": {
+            "query": """
+            MATCH (t:GPO {type: 'Certificate Template'})
+            WHERE t.Enabled = true
+            WITH t,
+                 CASE
+                     WHEN t.`Enrollee Supplies Subject` = true AND t.`Client Authentication` = true THEN 'ESC1'
+                     ELSE null
+                 END AS esc1,
+                 CASE
+                     WHEN t.`Extended Key Usage` IS NULL OR size(t.`Extended Key Usage`) = 0 OR 'Any Purpose' IN t.`Extended Key Usage` OR t.`Any Purpose` = true THEN 'ESC2'
+                     ELSE null
+                 END AS esc2,
+                 CASE
+                     WHEN t.`Extended Key Usage` IS NULL OR size(t.`Extended Key Usage`) = 0 OR 'Any Purpose' IN t.`Extended Key Usage` OR t.`Any Purpose` = true OR 'Certificate Request Agent' IN t.`Extended Key Usage` THEN 'ESC3'
+                     ELSE null
+                 END AS esc3,
+                 CASE
+                     WHEN 'NoSecurityExtension' IN t.`Enrollment Flag` THEN 'ESC9'
+                     ELSE null
+                 END AS esc9
+            WITH t, [esc1, esc2, esc3, esc9] AS esc_list
+            WITH t, [esc IN esc_list WHERE esc IS NOT NULL] AS Vulnerabilities
+            WHERE size(Vulnerabilities) > 0
+            RETURN
+              t.name AS TemplateName,
+              t.description AS TemplateDescription,
+              Vulnerabilities
+            ORDER BY TemplateName
+            """,
+            "columns": ["TemplateName", "TemplateDescription", "Vulnerabilities"]
+        },
     }
 
     # Determine which query to execute based on args
@@ -584,6 +616,8 @@ def run_adcs(args):
         selected_query = queries["esc1_owned_path"]
     elif args.enrollment_rights:
         selected_query = queries["enrollment_rights"]
+    elif args.vulnerable_templates:
+        selected_query = queries["vulnerable_templates"]
     else:
         print("No valid ADCS option selected.")
         return
@@ -1812,6 +1846,7 @@ def main():
     adcs_switch.add_argument("--cas", dest="cas", default=False, action="store_true", help="List all Certificate Authorities")
     adcs_switch.add_argument("--templates", dest="templates", default=False, action="store_true", help="List all enabled Certificate Templates")
     adcs_switch.add_argument("--enrollment-rights", dest="enrollment_rights", default=False, action="store_true", help="List enrollment rights for all Certificate Templates")
+    adcs_switch.add_argument("--vulnerable_templates", dest="vulnerable_templates", default=False, action="store_true", help="List all vulnerable Certificate Templates")
 
     adcs_parser.add_argument("--get-note", dest="getnote", default=False, action="store_true", help="Optional, return the 'notes' attribute for whatever objects are returned")
     adcs_parser.add_argument("-l", dest="label", action="store_true", default=False, help="Optional, apply labels to the columns returned")
