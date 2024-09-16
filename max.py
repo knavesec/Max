@@ -210,7 +210,7 @@ def get_info(args):
             "columns" : ["ObjectName","SID","DomainName","ForeignObjectName"]
         },
         "unsupos" : {
-            "query" : "MATCH (c:Computer) WHERE c.operatingsystem =~ '.*(2000|2003|2008|xp|vista| 7 |me).*' RETURN c.name,c.operatingsystem",
+             "query" : "MATCH (c:Computer) WHERE toLower(c.operatingsystem) =~ '.*(2000|2003|2008|xp|vista| 7 |me).*' RETURN c.name,c.operatingsystem",
             "columns" : ["ComputerName","OperatingSystem"]
         },
         "foreignprivs" : {
@@ -242,214 +242,6 @@ def get_info(args):
             "columns": ["ComputerName", "HasAdmin", "UserName"]
         }
     }
-
-
-    if args.adcs:
-        queries.update({
-            "Find all Certificate Templates": {
-                "query": "MATCH (n:GPO) WHERE n.type = 'Certificate Template' RETURN n.name AS TemplateName, n",
-                "columns": ["TemplateName", "Node"]
-            },
-            "Find enabled Certificate Templates": {
-                "query": "MATCH (n:GPO) WHERE n.type = 'Certificate Template' AND n.Enabled = true RETURN n.name AS TemplateName, n",
-                "columns": ["TemplateName", "Node"]
-            },
-            "Find Certificate Authorities": {
-                "query": "MATCH (n:GPO) WHERE n.type = 'Enrollment Service' RETURN n.name AS CAName, n",
-                "columns": ["CAName", "Node"]
-            },
-            "Find Misconfigured Certificate Templates (ESC1)": {
-                "query": """
-                MATCH (n:GPO)
-                WHERE n.type = 'Certificate Template'
-                  AND n.`Enrollee Supplies Subject` = true
-                  AND n.`Client Authentication` = true
-                  AND n.Enabled = true
-                RETURN n.name AS TemplateName, n
-                """,
-                "columns": ["TemplateName", "Node"]
-            },
-            "Find Misconfigured Certificate Templates (ESC2)": {
-                "query": """
-                MATCH (n:GPO)
-                WHERE n.type = 'Certificate Template'
-                  AND n.Enabled = true
-                  AND (
-                    n.`Extended Key Usage` = []
-                    OR 'Any Purpose' IN n.`Extended Key Usage`
-                    OR n.`Any Purpose` = true
-                  )
-                RETURN n.name AS TemplateName, n
-                """,
-                "columns": ["TemplateName", "Node"]
-            },
-            "Find Enrollment Agent Templates (ESC3)": {
-                "query": """
-                MATCH (n:GPO)
-                WHERE n.type = 'Certificate Template'
-                  AND n.Enabled = true
-                  AND (
-                    n.`Extended Key Usage` = []
-                    OR 'Any Purpose' IN n.`Extended Key Usage`
-                    OR 'Certificate Request Agent' IN n.`Extended Key Usage`
-                    OR n.`Any Purpose` = true
-                  )
-                RETURN n.name AS TemplateName, n
-                """,
-                "columns": ["TemplateName", "Node"]
-            },
-            "Find Certificate Authorities with User Specified SAN (ESC6)": {
-                "query": """
-                MATCH (n:GPO)
-                WHERE n.type = 'Enrollment Service'
-                  AND n.`User Specified SAN` = 'Enabled'
-                RETURN n.name AS CAName, n
-                """,
-                "columns": ["CAName", "Node"]
-            },
-            "Find Certificate Authorities with HTTP Web Enrollment (ESC8)": {
-                "query": """
-                MATCH (n:GPO)
-                WHERE n.type = 'Enrollment Service'
-                  AND n.`Web Enrollment` = 'Enabled'
-                RETURN n.name AS CAName, n
-                """,
-                "columns": ["CAName", "Node"]
-            },
-            "Shortest Paths to Misconfigured Certificate Templates from Owned Principals (ESC1)": {
-                "query": """
-                MATCH p = allShortestPaths((g {owned: true})-[*1..]->(n:GPO))
-                WHERE g <> n
-                  AND n.type = 'Certificate Template'
-                  AND n.`Enrollee Supplies Subject` = true
-                  AND n.`Client Authentication` = true
-                  AND n.Enabled = true
-                RETURN p
-                """,
-                "columns": ["Path"]
-            },
-            "Shortest Paths to Misconfigured Certificate Templates from Owned Principals (ESC2)": {
-                "query": """
-                MATCH p = allShortestPaths((g {owned: true})-[*1..]->(n:GPO))
-                WHERE g <> n
-                  AND n.type = 'Certificate Template'
-                  AND n.Enabled = true
-                  AND (
-                    n.`Extended Key Usage` = []
-                    OR 'Any Purpose' IN n.`Extended Key Usage`
-                    OR n.`Any Purpose` = true
-                  )
-                RETURN p
-                """,
-                "columns": ["Path"]
-            },
-            "Shortest Paths to Enrollment Agent Templates from Owned Principals (ESC3)": {
-                "query": """
-                MATCH p = allShortestPaths((g {owned: true})-[*1..]->(n:GPO))
-                WHERE g <> n
-                  AND n.type = 'Certificate Template'
-                  AND n.Enabled = true
-                  AND (
-                    n.`Extended Key Usage` = []
-                    OR 'Any Purpose' IN n.`Extended Key Usage`
-                    OR n.`Any Purpose` = true
-                    OR 'Certificate Request Agent' IN n.`Extended Key Usage`
-                  )
-                RETURN p
-                """,
-                "columns": ["Path"]
-            },
-            "Shortest Paths to Vulnerable Certificate Template Access Control (ESC4)": {
-                "query": """
-                MATCH p = shortestPath((g)-[:GenericAll|GenericWrite|Owns|WriteDacl|WriteOwner*1..]->(n:GPO))
-                WHERE g <> n
-                  AND n.type = 'Certificate Template'
-                  AND n.Enabled = true
-                RETURN p
-                """,
-                "columns": ["Path"]
-            },
-            "Shortest Paths to Vulnerable Certificate Template Access Control from Owned Principals (ESC4)": {
-                "query": """
-                MATCH p = allShortestPaths((g {owned: true})-[r*1..]->(n:GPO))
-                WHERE g <> n
-                  AND n.type = 'Certificate Template'
-                  AND n.Enabled = true
-                  AND NONE(x IN relationships(p) WHERE type(x) = 'Enroll' OR type(x) = 'AutoEnroll')
-                RETURN p
-                """,
-                "columns": ["Path"]
-            },
-            "Shortest Paths to Vulnerable Certificate Authority Access Control (ESC7)": {
-                "query": """
-                MATCH p = shortestPath((g)-[r:GenericAll|GenericWrite|Owns|WriteDacl|WriteOwner|ManageCa|ManageCertificates*1..]->(n:GPO))
-                WHERE g <> n
-                  AND n.type = 'Enrollment Service'
-                RETURN p
-                """,
-                "columns": ["Path"]
-            },
-            "Shortest Paths to Vulnerable Certificate Authority Access Control from Owned Principals (ESC7)": {
-                "query": """
-                MATCH p = allShortestPaths((g {owned: true})-[*1..]->(n:GPO))
-                WHERE g <> n
-                  AND n.type = 'Enrollment Service'
-                  AND NONE(x IN relationships(p) WHERE type(x) = 'Enroll' OR type(x) = 'AutoEnroll')
-                RETURN p
-                """,
-                "columns": ["Path"]
-            },
-            "Shortest Paths to Unsecured Certificate Templates from Owned Principals (ESC9)": {
-                "query": """
-                MATCH p = allShortestPaths((g {owned: true})-[r*1..]->(n:GPO))
-                WHERE n.type = 'Certificate Template'
-                  AND g <> n
-                  AND 'NoSecurityExtension' IN n.`Enrollment Flag`
-                  AND n.Enabled = true
-                  AND NONE(rel IN r WHERE type(rel) IN ['EnabledBy', 'Read', 'ManageCa', 'ManageCertificates'])
-                RETURN p
-                """,
-                "columns": ["Path"]
-            },
-            "Find Unsecured Certificate Templates (ESC9)": {
-                "query": """
-                MATCH (n:GPO)
-                WHERE n.type = 'Certificate Template'
-                  AND 'NoSecurityExtension' IN n.`Enrollment Flag`
-                  AND n.Enabled = true
-                RETURN n.name AS TemplateName, n
-                """,
-                "columns": ["TemplateName", "Node"]
-            },
-        })
-
-    query = ""
-    cols = []
-    data_format = "row"
-
-    if args.adcs:
-        for query_name, query_info in queries.items():
-            if query_name.startswith("Find") or query_name.startswith("Shortest Paths"):
-                query = query_info["query"]
-                cols = query_info["columns"]
-                if args.getnote:
-                    query = query + ", n.notes"
-                    cols.append("Notes")
-                r = do_query(args, query, data_format=data_format)
-                x = json.loads(r.text)
-                entry_list = x["results"][0]["data"]
-                if len(entry_list) == 0:
-                    print(f"No results found for {query_name}")
-                else:
-                    print(f"Results for {query_name}:")
-                    if args.label:
-                        print(" - ".join(cols))
-                    for entry in entry_list:
-                        output = get_query_output(entry, args.delimeter, cols_len=len(cols))
-                        print(output)
-                print("\n")
-
-
 
     query = ""
     cols = []
@@ -589,6 +381,191 @@ def get_info(args):
             print(" - ".join(cols))
         for entry in entry_list:
             print(get_query_output(entry,args.delimeter,cols_len=len(cols)))
+
+def run_adcs(args):
+
+    queries = {
+        "esc1": {
+            "query": """
+            MATCH (n:GPO)
+            WHERE n.type = 'Certificate Template'
+              AND n.`Enrollee Supplies Subject` = true
+              AND n.`Client Authentication` = true
+              AND n.Enabled = true
+            RETURN n.name AS TemplateName
+            """,
+            "columns": ["TemplateName"]
+        },
+        "esc2": {
+            "query": """
+            MATCH (n:GPO)
+            WHERE n.type = 'Certificate Template'
+              AND n.Enabled = true
+              AND (
+                n.`Extended Key Usage` = []
+                OR 'Any Purpose' IN n.`Extended Key Usage`
+                OR n.`Any Purpose` = true
+              )
+            RETURN n.name AS TemplateName
+            """,
+            "columns": ["TemplateName"]
+        },
+        "esc3": {
+            "query": """
+            MATCH (n:GPO)
+            WHERE n.type = 'Certificate Template'
+              AND n.Enabled = true
+              AND (
+                n.`Extended Key Usage` = []
+                OR 'Any Purpose' IN n.`Extended Key Usage`
+                OR 'Certificate Request Agent' IN n.`Extended Key Usage`
+                OR n.`Any Purpose` = true
+              )
+            RETURN n.name AS TemplateName
+            """,
+            "columns": ["TemplateName"]
+        },
+        "esc4_path": {
+            "query": """
+            MATCH p = shortestPath((g)-[:GenericAll|GenericWrite|Owns|WriteDacl|WriteOwner*1..]->(n:GPO))
+            WHERE g <> n
+              AND n.type = 'Certificate Template'
+              AND n.Enabled = true
+            RETURN p
+            """,
+            "columns": ["Path"],
+            "data_format": "graph"
+        },
+        "esc4_owned_path": {
+            "query": """
+            MATCH p = allShortestPaths((g {owned: true})-[r*1..]->(n:GPO))
+            WHERE g <> n
+              AND n.type = 'Certificate Template'
+              AND n.Enabled = true
+              AND NONE(x IN relationships(p) WHERE type(x) = 'Enroll' OR type(x) = 'AutoEnroll')
+            RETURN p
+            """,
+            "columns": ["Path"],
+            "data_format": "graph"
+        },
+        "esc6": {
+            "query": """
+            MATCH (n:GPO)
+            WHERE n.type = 'Enrollment Service'
+              AND n.`User Specified SAN` = 'Enabled'
+            RETURN n.name AS CAName
+            """,
+            "columns": ["CAName"]
+        },
+        "esc7_path": {
+            "query": """
+            MATCH p = shortestPath((g)-[r:GenericAll|GenericWrite|Owns|WriteDacl|WriteOwner|ManageCa|ManageCertificates*1..]->(n:GPO))
+            WHERE g <> n
+              AND n.type = 'Enrollment Service'
+            RETURN p
+            """,
+            "columns": ["Path"],
+            "data_format": "graph"
+        },
+        "esc7_owned_path": {
+            "query": """
+            MATCH p = allShortestPaths((g {owned: true})-[*1..]->(n:GPO))
+            WHERE g <> n
+              AND n.type = 'Enrollment Service'
+              AND NONE(x IN relationships(p) WHERE type(x) = 'Enroll' OR type(x) = 'AutoEnroll')
+            RETURN p
+            """,
+            "columns": ["Path"],
+            "data_format": "graph"
+        },
+        "esc8": {
+            "query": """
+            MATCH (n:GPO)
+            WHERE n.type = 'Enrollment Service'
+              AND n.`Web Enrollment` = 'Enabled'
+            RETURN n.name AS CAName
+            """,
+            "columns": ["CAName"]
+        },
+        "esc9": {
+            "query": """
+            MATCH (n:GPO)
+            WHERE n.type = 'Certificate Template'
+              AND 'NoSecurityExtension' IN n.`Enrollment Flag`
+              AND n.Enabled = true
+            RETURN n.name AS TemplateName
+            """,
+            "columns": ["TemplateName"]
+        },
+        "esc9_owned_path": {
+            "query": """
+            MATCH p = allShortestPaths((g {owned: true})-[r*1..]->(n:GPO))
+            WHERE n.type = 'Certificate Template'
+              AND g <> n
+              AND 'NoSecurityExtension' IN n.`Enrollment Flag`
+              AND n.Enabled = true
+              AND NONE(rel IN r WHERE type(rel) IN ['EnabledBy', 'Read', 'ManageCa', 'ManageCertificates'])
+            RETURN p
+            """,
+            "columns": ["Path"],
+            "data_format": "graph"
+        }
+    }
+
+    # Determine which query to execute based on args
+    selected_query = None
+
+    if args.esc1:
+        selected_query = queries["esc1"]
+    elif args.esc2:
+        selected_query = queries["esc2"]
+    elif args.esc3:
+        selected_query = queries["esc3"]
+    elif args.esc4_path:
+        selected_query = queries["esc4_path"]
+    elif args.esc4_owned_path:
+        selected_query = queries["esc4_owned_path"]
+    elif args.esc6:
+        selected_query = queries["esc6"]
+    elif args.esc7_path:
+        selected_query = queries["esc7_path"]
+    elif args.esc7_owned_path:
+        selected_query = queries["esc7_owned_path"]
+    elif args.esc8:
+        selected_query = queries["esc8"]
+    elif args.esc9:
+        selected_query = queries["esc9"]
+    elif args.esc9_owned_path:
+        selected_query = queries["esc9_owned_path"]
+    else:
+        print("No valid ESC option selected.")
+        return
+
+    query = selected_query["query"]
+    cols = selected_query["columns"]
+    data_format = selected_query.get("data_format", "row")
+
+    if args.getnote:
+        query = query + ", n.notes"
+        cols.append("Notes")
+
+    r = do_query(args, query, data_format=data_format)
+    x = json.loads(r.text)
+    entry_list = x["results"][0]["data"]
+
+    if len(entry_list) == 0:
+        print("No results found.")
+    else:
+        if data_format == "graph":
+            for entry in entry_list:
+                output = get_query_output(entry, args.delimeter, path=True)
+                print(output)
+        else:
+            if args.label:
+                print(" - ".join(cols))
+            for entry in entry_list:
+                output = get_query_output(entry, args.delimeter, cols_len=len(cols))
+                print(output)
 
 
 def mark_owned(args):
@@ -1116,7 +1093,7 @@ def dpat_func(args):
             'label' : "Domain Admin Members"
         },
         {
-            'query' : "MATCH (g:Group) WHERE g.objectid ENDS WITH '-512' MATCH (u:User {cracked:true})-[r:MemberOf*1..]->(g) RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
+            'query' : "match p = (k:Group)<-[:MemberOf*1..]-(m) where k.highvalue = true WITH [ n in nodes(p) WHERE n:User] as ulist UNWIND (ulist) as u RETURN DISTINCT u.enabled,u.ntds_uname,u.password,u.nt_hash",
             'label' : "Domain Admin Members Cracked"
         },
         {
@@ -1728,7 +1705,6 @@ def main():
     addspw = switch.add_parser("add-spw",help="Create 'SharesPasswordWith' relationships with targets from a file. Adds edge indicating two objects share a password (repeated local administrator)")
     dpat = switch.add_parser("dpat",help="BloodHound Domain Password Audit Tool, run cracked user-password analysis tied with BloodHound through a Hashcat potfile & NTDS")
     petmax = switch.add_parser("pet-max",help="Pet max, hes a good boy (pet me again, I say different things)")
-    adcs = switch.add_parser("adcs",help="adcs")
     getinfo_switch = getinfo.add_mutually_exclusive_group(required=True)
     getinfo_switch.add_argument("--users",dest="users",default=False,action="store_true",help="Return a list of all domain users")
     getinfo_switch.add_argument("--comps",dest="comps",default=False,action="store_true",help="Return a list of all domain computers")
@@ -1763,12 +1739,33 @@ def main():
     getinfo_switch.add_argument("--hvt-paths",dest="hvtpaths",default="",help="Return all paths from the input node to HVTs")
     getinfo_switch.add_argument("--owned-paths",dest="ownedpaths",default=False,action="store_true",help="Return all paths from owned objects to HVTs")
     getinfo_switch.add_argument("--owned-admins", dest="ownedadmins",default=False,action="store_true",help="Return all computers owned users are admins to")
-    getinfo_switch.add_argument("--adcs", dest="adcs", default=False, action="store_true", help="Perform AD CS ESC attack detection queries")
+
     
     getinfo.add_argument("--get-note",dest="getnote",default=False,action="store_true",help="Optional, return the \"notes\" attribute for whatever objects are returned")
     getinfo.add_argument("-l",dest="label",action="store_true",default=False,help="Optional, apply labels to the columns returned")
     getinfo.add_argument("-e","--enabled",dest="enabled",action="store_true",default=False,help="Optional, only return enabled domain users (only works for --users and --passnotreq flags as of now)")
     getinfo.add_argument("-d", "--delim",dest="delimeter", default="-", required=False, help="Flag to specify output delimeter between attributes (default '-')")
+
+    # adcs command
+    adcs_parser = switch.add_parser("adcs", help="Run AD CS ESC attack detection queries")
+    adcs_switch = adcs_parser.add_mutually_exclusive_group(required=True)
+    adcs_switch.add_argument("--esc1", dest="esc1", default=False, action="store_true", help="Find Misconfigured Certificate Templates (ESC1)")
+    adcs_switch.add_argument("--esc2", dest="esc2", default=False, action="store_true", help="Find Misconfigured Certificate Templates (ESC2)")
+    adcs_switch.add_argument("--esc3", dest="esc3", default=False, action="store_true", help="Find Enrollment Agent Templates (ESC3)")
+    adcs_switch.add_argument("--esc4-path", dest="esc4_path", default=False, action="store_true", help="Shortest Paths to Vulnerable Certificate Template Access Control (ESC4)")
+    adcs_switch.add_argument("--esc4-owned-path", dest="esc4_owned_path", default=False, action="store_true", help="Shortest Paths to Vulnerable Certificate Template Access Control from Owned Principals (ESC4)")
+    adcs_switch.add_argument("--esc6", dest="esc6", default=False, action="store_true", help="Find Certificate Authorities with User Specified SAN (ESC6)")
+    adcs_switch.add_argument("--esc7-path", dest="esc7_path", default=False, action="store_true", help="Shortest Paths to Vulnerable Certificate Authority Access Control (ESC7)")
+    adcs_switch.add_argument("--esc7-owned-path", dest="esc7_owned_path", default=False, action="store_true", help="Shortest Paths to Vulnerable Certificate Authority Access Control from Owned Principals (ESC7)")
+    adcs_switch.add_argument("--esc8", dest="esc8", default=False, action="store_true", help="Find Certificate Authorities with HTTP Web Enrollment (ESC8)")
+    adcs_switch.add_argument("--esc9", dest="esc9", default=False, action="store_true", help="Find Unsecured Certificate Templates (ESC9)")
+    adcs_switch.add_argument("--esc9-owned-path", dest="esc9_owned_path", default=False, action="store_true", help="Shortest Paths to Unsecured Certificate Templates from Owned Principals (ESC9)")
+
+    adcs_parser.add_argument("--get-note", dest="getnote", default=False, action="store_true", help="Optional, return the 'notes' attribute for whatever objects are returned")
+    adcs_parser.add_argument("-l", dest="label", action="store_true", default=False, help="Optional, apply labels to the columns returned")
+    adcs_parser.add_argument("-d", "--delim", dest="delimeter", default="-", required=False, help="Flag to specify output delimiter between attributes (default '-')")
+
+
 
     # MARKOWNED function paramters
     markowned.add_argument("-f","--file",dest="filename",default="",required=False,help="Filename containing AD objects (must have FQDN attached)")
@@ -1820,6 +1817,7 @@ def main():
     dpat.add_argument("--own-cracked", dest="own_cracked", action="store_true", required=False, help="Mark all users with cracked passwords as owned")
     dpat.add_argument("--add-crack-note",dest="add_crack_note",action="store_true",required=False,help="Add a note to cracked users indicating they have been cracked")
 
+
     args = parser.parse_args()
 
 
@@ -1862,10 +1860,11 @@ def main():
         dpat_func(args)
     elif args.command == "pet-max":
         pet_max()
+    elif args.command == "adcs":
+        run_adcs(args)
     # else:
     #     print("Error: use a module or use -h/--help to see help")
 
 
 if __name__ == "__main__":
     main()
-
