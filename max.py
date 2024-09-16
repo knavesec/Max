@@ -512,9 +512,9 @@ def run_adcs(args):
         },
         "cas": {
             "query": """
-            MATCH (n:GPO) WHERE n.type = 'Enrollment Service' RETURN n.name AS CAName
+            MATCH (n:GPO) WHERE n.type = 'Enrollment Service' RETURN n.name AS CAName, n.`DNS Name` AS DNSHostname
             """,
-            "columns": ["CAName"],
+            "columns": ["CAName", "DNSHostname"],
         },
         "templates": {
             "query": """
