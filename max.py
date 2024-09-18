@@ -240,6 +240,10 @@ def get_info(args):
         "ownedadmins" : {
             "query": "match (u:User {owned: True})-[r:AdminTo|MemberOf*1..]->(c:Computer) return c.name, \"AdministratedBy\", u.name order by c, u",
             "columns": ["ComputerName", "HasAdmin", "UserName"]
+        },
+        "staleaccounts" : {
+            "query" : "WITH datetime().epochseconds - (90 * 86400) AS threshold MATCH (u:User {enabled:TRUE}) WHERE u.lastlogon < threshold RETURN u.name",
+            "columns" : ["UserName"]
         }
     }
 
@@ -333,6 +337,10 @@ def get_info(args):
     elif (args.ownedadmins):
         query = queries["ownedadmins"]["query"]
         cols = queries["ownedadmins"]["columns"]
+    elif (args.staleaccounts):
+        print("IM IN THE RIGHT PLACE")
+        query = queries["staleaccounts"]["query"]
+        cols = queries['staleaccounts']['columns']
     elif (args.path != ""):
         start = args.path.split(',')[0].strip().upper()
         end = args.path.split(',')[1].strip().upper()
@@ -368,9 +376,9 @@ def get_info(args):
 
     r = do_query(args, query, data_format=data_format)
     x = json.loads(r.text)
-    # print(r.text)
+    print(r.text)
     entry_list = x["results"][0]["data"]
-    # print(entry_list)
+    print(entry_list)
 
     if cols[0] == "Path":
         for entry in entry_list:
@@ -1555,6 +1563,7 @@ def main():
     getinfo_switch.add_argument("--hvt-paths",dest="hvtpaths",default="",help="Return all paths from the input node to HVTs")
     getinfo_switch.add_argument("--owned-paths",dest="ownedpaths",default=False,action="store_true",help="Return all paths from owned objects to HVTs")
     getinfo_switch.add_argument("--owned-admins", dest="ownedadmins",default=False,action="store_true",help="Return all computers owned users are admins to")
+    getinfo_switch.add_argument("--stale-accounts", dest="staleaccounts",default=False,action="store_true",help="Return a list of all accounts that are enable but have not logged in within 90 days")
 
     getinfo.add_argument("--get-note",dest="getnote",default=False,action="store_true",help="Optional, return the \"notes\" attribute for whatever objects are returned")
     getinfo.add_argument("-l",dest="label",action="store_true",default=False,help="Optional, apply labels to the columns returned")
