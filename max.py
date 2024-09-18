@@ -376,9 +376,9 @@ def get_info(args):
 
     r = do_query(args, query, data_format=data_format)
     x = json.loads(r.text)
-    print(r.text)
+    # print(r.text)
     entry_list = x["results"][0]["data"]
-    print(entry_list)
+    # print(entry_list)
 
     if cols[0] == "Path":
         for entry in entry_list:
