@@ -240,7 +240,30 @@ def get_info(args):
         "ownedadmins" : {
             "query": "match (u:User {owned: True})-[r:AdminTo|MemberOf*1..]->(c:Computer) return c.name, \"AdministratedBy\", u.name order by c, u",
             "columns": ["ComputerName", "HasAdmin", "UserName"]
-        }
+        },
+         "sccm_objects": {
+            "query": """
+            MATCH (n)
+            WHERE toLower(n.name) CONTAINS toLower('SCCM')
+            WITH n,
+                 CASE
+                     WHEN 'User' IN labels(n) THEN 'User'
+                     WHEN 'Computer' IN labels(n) THEN 'Computer'
+                     WHEN 'Group' IN labels(n) THEN 'Group'
+                     WHEN 'Domain' IN labels(n) THEN 'Domain'
+                     WHEN 'OU' IN labels(n) THEN 'Organizational Unit'
+                     WHEN 'GPO' IN labels(n) THEN 'Group Policy Object'
+                     ELSE 'Other'
+                 END AS ObjectType
+            RETURN
+              n.name AS ObjectName,
+              ObjectType,
+              n.HostName AS DNSHostname,
+              n.description AS Description
+            ORDER BY ObjectType, ObjectName
+            """,
+            "columns": ["ObjectName", "ObjectType", "DNSHostname", "Description"]
+        },
     }
 
     query = ""
@@ -353,6 +376,10 @@ def get_info(args):
     elif (args.ownedpaths != ""):
         query = queries["ownedpaths"]["query"]
         cols = queries["ownedpaths"]["columns"]
+        data_format = "graph"
+    elif (args.sccm_objects):
+        query = queries["sccm_objects"]
+        cols = queries["ObjectName", "ObjectType", "DNSHostname", "Description"]
         data_format = "graph"
 
     if args.getnote:
@@ -1821,7 +1848,7 @@ def main():
     getinfo_switch.add_argument("--hvt-paths",dest="hvtpaths",default="",help="Return all paths from the input node to HVTs")
     getinfo_switch.add_argument("--owned-paths",dest="ownedpaths",default=False,action="store_true",help="Return all paths from owned objects to HVTs")
     getinfo_switch.add_argument("--owned-admins", dest="ownedadmins",default=False,action="store_true",help="Return all computers owned users are admins to")
-
+    getinfo_switch.add_argument("--sccm-objects", dest="sccm_objects", default=False, action="store_true", help="Return all domain objects with 'SCCM' in the name, along with their object type, DNS hostname, and description")
     
     getinfo.add_argument("--get-note",dest="getnote",default=False,action="store_true",help="Optional, return the \"notes\" attribute for whatever objects are returned")
     getinfo.add_argument("-l",dest="label",action="store_true",default=False,help="Optional, apply labels to the columns returned")
@@ -1846,7 +1873,7 @@ def main():
     adcs_switch.add_argument("--cas", dest="cas", default=False, action="store_true", help="List all Certificate Authorities")
     adcs_switch.add_argument("--templates", dest="templates", default=False, action="store_true", help="List all enabled Certificate Templates")
     adcs_switch.add_argument("--enrollment-rights", dest="enrollment_rights", default=False, action="store_true", help="List enrollment rights for all Certificate Templates")
-    adcs_switch.add_argument("--vulnerable_templates", dest="vulnerable_templates", default=False, action="store_true", help="List all vulnerable Certificate Templates")
+    adcs_switch.add_argument("--vulnerable-templates", dest="vulnerable_templates", default=False, action="store_true", help="List all vulnerable Certificate Templates")
 
     adcs_parser.add_argument("--get-note", dest="getnote", default=False, action="store_true", help="Optional, return the 'notes' attribute for whatever objects are returned")
     adcs_parser.add_argument("-l", dest="label", action="store_true", default=False, help="Optional, apply labels to the columns returned")
