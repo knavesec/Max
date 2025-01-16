@@ -404,14 +404,24 @@ def mark_owned(args):
 
         for line in f:
 
-            query = 'MATCH (n) WHERE n.name="{uname}" SET n.owned=true {notes} RETURN n'.format(uname=line.upper().strip(),notes=note_string)
+            if args.userpass is True or args.store:
+                uname, passwd = line.strip().split(':')
+                uname = uname.upper()
+                if args.store:
+                    passwd_query = "SET n.password=\"" + passwd + "\""
+                else:
+                    passwd_query = ""
+            else:
+                uname = line.upper().strip()
+
+            query = 'MATCH (n) WHERE n.name="{uname}" SET n.owned=true {notes} {passwd} RETURN n'.format(uname=uname,passwd=passwd_query,notes=note_string)
             r = do_query(args, query)
 
             fail_resp = '{"results":[{"columns":["n"],"data":[]}],"errors":[]}'
             if r.text == fail_resp:
-                print("[-] AD Object: " + line.upper().strip() + " could not be marked as owned")
+                print("[-] AD Object: " + uname + " could not be marked as owned")
             else:
-                print("[+] AD Object: " + line.upper().strip() + " marked as owned successfully")
+                print("[+] AD Object: " + uname + " marked as owned successfully")
 
 
 def mark_hvt(args):
@@ -1566,6 +1576,8 @@ def main():
 
     # MARKOWNED function paramters
     markowned.add_argument("-f","--file",dest="filename",default="",required=False,help="Filename containing AD objects (must have FQDN attached)")
+    markowned.add_argument("--userpass", action="store_true",help="Treat input file as a USER:PASS file")
+    markowned.add_argument('-s', '--store',action="store_true", help="Record the password in the database. (Implies --userpass)")
     markowned.add_argument("--add-note",dest="notes",default="",help="Notes to add to all marked objects (method of compromise)")
     markowned.add_argument("--clear",dest="clear",action="store_true",help="Remove owned marker from all objects")
 
@@ -1636,6 +1648,9 @@ def main():
         if args.filename == "" and args.clear == False:
             print("Module mark-owned requires either -f filename or --clear options")
         else:
+            # Check this here as it's a continuable error
+            if args.store == True and args.userpass ==False:
+                print('[!] -s or --store passed, assuming the input file is in user:pass format!')
             mark_owned(args)
     elif args.command == "mark-hvt":
         if args.filename == "" and args.clear == False:
