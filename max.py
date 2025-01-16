@@ -74,7 +74,10 @@ def get_query_output(entry,delimeter,cols_len=None,path=False):
             edge_dict = {}
 
             for node in nodes:
-                node_dict[node['id']] = node['properties']['name']
+                try:
+                    node_dict[node['id']] = node['properties']['name']
+                except:
+                    node_dict[node['id']] = node['properties']['objectid']
 
             for edge in edges:
                 edge_dict[node_dict[edge['startNode']]] = ["-", edge['type'], "->", node_dict[edge['endNode']]]
