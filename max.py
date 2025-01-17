@@ -242,7 +242,7 @@ def get_info(args):
             "columns": ["ComputerName", "HasAdmin", "UserName"]
         },
         "staleaccounts" : {
-            "query" : "WITH datetime().epochseconds - (90 * 86400) AS threshold MATCH (u:User {enabled:TRUE}) WHERE u.lastlogon < threshold RETURN u.name",
+            "query" : "WITH datetime().epochseconds - (90 * 86400) AS threshold MATCH (u:User {enabled:TRUE}) WHERE u.lastlogon < threshold OR u.lastlogontimestamp < threshold RETURN u.name",
             "columns" : ["UserName"]
         }
     }
@@ -338,7 +338,6 @@ def get_info(args):
         query = queries["ownedadmins"]["query"]
         cols = queries["ownedadmins"]["columns"]
     elif (args.staleaccounts):
-        print("IM IN THE RIGHT PLACE")
         query = queries["staleaccounts"]["query"]
         cols = queries['staleaccounts']['columns']
     elif (args.path != ""):
