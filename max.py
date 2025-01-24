@@ -1481,17 +1481,18 @@ def pet_max():
         "Hack the planet!",
         "10/10 would pet - @blurbdust",
         "dogsay > cowsay - @b1gbroth3r",
-        "much query, very sniff - @vexance"
+        "much query, very sniff - @vexance",
+        "can has treat? - @thetoddluci0"
     ]
 
-    max = """
-                                        \\   /
-         /|                   ______     \\ |
+    max = r"""
+                                        \   /
+         /|                   ______     \ |
         { (                  /( ) ^ `--o  |/
          \ \________________/     ____/
           \                       /
            (    >    ___   >     )
-            \_      )   \____\  \\\\
+            \_      )   \____\  \\
              )   /\ (         `. ))
              (  {  \_\_       / //
               \_\_  '''       '''
