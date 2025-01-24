@@ -1572,8 +1572,8 @@ def main():
     getinfo_switch.add_argument("--hvt-paths",dest="hvtpaths",default="",help="Return all paths from the input node to HVTs")
     getinfo_switch.add_argument("--owned-paths",dest="ownedpaths",default=False,action="store_true",help="Return all paths from owned objects to HVTs")
     getinfo_switch.add_argument("--owned-admins", dest="ownedadmins",default=False,action="store_true",help="Return all computers owned users are admins to")
-    getinfo_switch.add_argument("--stale-accounts", dest="staleaccounts",default=False,action="store_true",help="Return a list of all users that are enable but have not logged into the domain recently. Configure with --threshold.")
-    getinfo_switch.add_argument("--stale-computers", dest="stalecomputers",action="store_true",help="Return a list of all computers which are enabled but have not logged into the domain recently. Configure with --threshold.")
+    getinfo_switch.add_argument("--stale-accounts", dest="staleaccounts",default=False,action="store_true",help="Return a list of all users that are enable but have not logged into the domain recently. Configure with --stale-threshold.")
+    getinfo_switch.add_argument("--stale-computers", dest="stalecomputers",action="store_true",help="Return a list of all computers which are enabled but have not logged into the domain recently. Configure with --stale-threshold.")
 
     getinfo.add_argument("--get-note",dest="getnote",default=False,action="store_true",help="Optional, return the \"notes\" attribute for whatever objects are returned")
     getinfo.add_argument("-l",dest="label",action="store_true",default=False,help="Optional, apply labels to the columns returned")
