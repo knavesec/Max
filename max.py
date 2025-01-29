@@ -243,6 +243,17 @@ def get_info(args):
         "ownedadmins" : {
             "query": "match (u:User {owned: True})-[r:AdminTo|MemberOf*1..]->(c:Computer) return c.name, \"AdministratedBy\", u.name order by c, u",
             "columns": ["ComputerName", "HasAdmin", "UserName"]
+        },
+        "staleaccounts" : {
+            "query" : "WITH datetime().epochseconds - ({threshold_days} * 86400) AS threshold MATCH (u:User {{enabled:TRUE}}) WHERE u.lastlogon < threshold AND u.lastlogontimestamp < threshold RETURN u.name",
+            "columns" : ["UserName"]
+        },
+        "stalecomputers" : {
+            # I'm not 100% sure if this is the last time the machine account logged in, or the last time a user logged into the machine. 
+            # The general answer from MS seems to be "Don't use this, use event viewer"
+            # Either way, this is the only relevant atribute bloodhound provides
+            "query" : "WITH datetime().epochseconds - ({threshold_days} * 86400) AS threshold MATCH (c:Computer {{enabled:TRUE}}) WHERE c.lastlogon < threshold AND c.lastlogontimestamp < threshold RETURN c.name",
+            "columns" : ["ComputerName"]
         }
     }
 
@@ -336,6 +347,12 @@ def get_info(args):
     elif (args.ownedadmins):
         query = queries["ownedadmins"]["query"]
         cols = queries["ownedadmins"]["columns"]
+    elif (args.staleaccounts):
+        query = queries["staleaccounts"]["query"].format(threshold_days=args.threshold)
+        cols = queries["staleaccounts"]["columns"]
+    elif (args.stalecomputers):
+        query = queries["stalecomputers"]["query"].format(threshold_days=args.threshold)
+        cols = queries["stalecomputers"]["columns"]
     elif (args.path != ""):
         start = args.path.split(',')[0].strip().upper()
         end = args.path.split(',')[1].strip().upper()
@@ -1568,11 +1585,14 @@ def main():
     getinfo_switch.add_argument("--hvt-paths",dest="hvtpaths",default="",help="Return all paths from the input node to HVTs")
     getinfo_switch.add_argument("--owned-paths",dest="ownedpaths",default=False,action="store_true",help="Return all paths from owned objects to HVTs")
     getinfo_switch.add_argument("--owned-admins", dest="ownedadmins",default=False,action="store_true",help="Return all computers owned users are admins to")
+    getinfo_switch.add_argument("--stale-accounts", dest="staleaccounts",default=False,action="store_true",help="Return a list of all users that are enable but have not logged into the domain recently. Configure with --stale-threshold.")
+    getinfo_switch.add_argument("--stale-computers", dest="stalecomputers",action="store_true",help="Return a list of all computers which are enabled but have not logged into the domain recently. Configure with --stale-threshold.")
 
     getinfo.add_argument("--get-note",dest="getnote",default=False,action="store_true",help="Optional, return the \"notes\" attribute for whatever objects are returned")
     getinfo.add_argument("-l",dest="label",action="store_true",default=False,help="Optional, apply labels to the columns returned")
     getinfo.add_argument("-e","--enabled",dest="enabled",action="store_true",default=False,help="Optional, only return enabled domain users (only works for --users and --passnotreq flags as of now)")
     getinfo.add_argument("-d", "--delim",dest="delimeter", default="-", required=False, help="Flag to specify output delimeter between attributes (default '-')")
+    getinfo.add_argument("--stale-threshold", dest="threshold", default=90,type=int, help="Number of days an account can have failed to log in for in order to be considered stale. Default: 90 days")
 
     # MARKOWNED function paramters
     markowned.add_argument("-f","--file",dest="filename",default="",required=False,help="Filename containing AD objects (must have FQDN attached)")
