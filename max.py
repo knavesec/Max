@@ -754,9 +754,9 @@ def dpat_map_users(args, users, potfile):
             if nt_hash in potfile:
                 cracked_bool = 'true'
                 password = potfile[nt_hash]
-            elif lm_hash != "aad3b435b51404eeaad3b435b51404ee" and lm_hash in potfile:
+            elif lm_hash != "aad3b435b51404eeaad3b435b51404ee" and lm_hash[:16] in potfile and lm_hash[16:] in potfile:
                 cracked_bool = 'true'
-                password = potfile[lm_hash]
+                password = potfile[lm_hash[:16]] + potfile[lm_hash[16:]]
 
             if password != None:
                 if "$HEX[" in password:
@@ -846,7 +846,7 @@ def dpat_func(args):
                             continue
                         line = line.split(":")
 
-                        if len(line[0]) != 32:
+                        if len(line[0]) not in [16, 32]:
                             continue
 
                         potfile[line[0]] = line[1]
