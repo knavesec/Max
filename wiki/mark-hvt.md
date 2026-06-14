@@ -2,7 +2,7 @@
 
 Bulk import of HVT objects into the database
 
-[Back to Max](https://github.com/knavesec/Max)
+[Back to Max-BloodHound-CE](../README.md) | [Original Max](https://github.com/knavesec/Max)
 
 
 #### Notes

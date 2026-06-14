@@ -190,3 +190,13 @@ cython_debug/
 
 # Built Visual Studio Code Extensions
 *.vsix
+
+# Max - local run script (may contain credentials)
+run.sh
+
+# Generated DPAT reports
+report_*.html
+
+# Vim swap files
+.*.swp
+*.swp

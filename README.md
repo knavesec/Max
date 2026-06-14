@@ -1,145 +1,230 @@
-# Maximizing BloodHound with a simple suite of tools
+<p align="center">
+  <img src="https://img.shields.io/badge/BloodHound-Community%20Edition-red?style=for-the-badge" alt="BloodHound CE"/>
+  <img src="https://img.shields.io/badge/Python-3.6+-blue?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.6+"/>
+  <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License"/>
+</p>
 
-## Description
+<h1 align="center">Max - BloodHound CE Edition</h1>
 
-New Release:
+<p align="center">
+  <strong>Domain Password Audit Tool for BloodHound Community Edition with interactive single-file HTML reports and comprehensive password analytics.</strong>
+</p>
 
-- [dpat](https://github.com/knavesec/Max/blob/master/wiki/dpat.md) - The BloodHound Domain Password Audit Tool (DPAT)
+<p align="center">
+  <a href="#-quick-start">Quick Start</a> •
+  <a href="#-try-with-sample-data">Sample Data</a> •
+  <a href="#-features">Features</a> •
+  <a href="#-report-gallery">Gallery</a> •
+  <a href="#-all-modules">Modules</a> •
+  <a href="#-credits">Credits</a>
+</p>
 
-A simple suite of tools:
-- [get-info](https://github.com/knavesec/Max/blob/master/wiki/get-info.md) - Pull lists of information from the Neo4j database
-- [mark-owned](https://github.com/knavesec/Max/blob/master/wiki/mark-owned.md) - Mark a list of objects as Owned
-- [mark-hvt](https://github.com/knavesec/Max/blob/master/wiki/mark-hvt.md) - Mark a list of objects as High Value Targets
-- [query](https://github.com/knavesec/Max/blob/master/wiki/query.md) - Run a raw Cypher query and return output
-- [export](https://github.com/knavesec/Max/blob/master/wiki/export.md) - Export all outbound controlling privileges of a domain object to a CSV file
-- [del-edge](https://github.com/knavesec/Max/blob/master/wiki/del-edge.md) - Delete an edge from the database
-- [add-spns](https://github.com/knavesec/Max/blob/master/wiki/add-spns.md) - Create HasSPNConfigured relationships, new attack primitive
-- [add-spw](https://github.com/knavesec/Max/blob/master/wiki/add-spw.md) - Create SharesPasswordWith relationships
-- [dpat](https://github.com/knavesec/Max/blob/master/wiki/dpat.md) - The BloodHound Domain Password Audit Tool (DPAT)
-- [pet-max](https://github.com/knavesec/Max/blob/master/wiki/pet-max.md) - Dogsay, happiness for stressful engagements
+<p align="center">
+  <img src="https://img.shields.io/github/stars/exploit-development/Max-BloodHound-CE?style=social" alt="Stars"/>
+  <img src="https://img.shields.io/github/forks/exploit-development/Max-BloodHound-CE?style=social" alt="Forks"/>
+</p>
 
-This was released with screenshots & use-cases on the following blogs: [Max Release](https://whynotsecurity.com/blog/max/),  [Updates & Primitives](https://whynotsecurity.com/blog/max2/) & [DPAT](https://whynotsecurity.com/blog/max3/)
+<p align="center">
+  <a href="https://exploit-development.github.io/Max-BloodHound-CE/sample_report.html" target="_blank">
+    <img src="https://img.shields.io/badge/View-Sample%20Report-brightgreen?style=for-the-badge" alt="View Sample Report"/>
+  </a>
+</p>
 
-A new potential attack primitive was added to this tool during my research, see the `add-spns` section for full details.
+---
 
+<p align="center">
+  <img src="sample_data/screenshots/screenshot_1.png" alt="DPAT Summary Dashboard" width="900"/>
+</p>
 
-## Usage
+---
 
-### Installation
-
-Ideally there shouldn't be much to install, but I've included a requirements.txt file just in case. Tested on Kali Linux & Windows 10, all functionality should work for both linux and Windows operating systems.
-
-`pip3 install -r requirements.txt`
-
-### Neo4j Creds
-
-Neo4j credentials can be hardcoded at the beginning of the script, they can be provided as CLI arguments, or stored as environment variables. If either parameter  is left blank, you will be prompted for the uname/password. To use environment variables, it is probably easiest to add a line (e.g., `export NEO4J_USERNAME='neo4j'`) within *~/.bashrc* or *~/.zshrc*  to store the username since it isn't really sensitive. The database password can be set within your shell's tab prior to running Max. Adding a space before the export command should prevent it from appearing within history.
+## Quick Start
 
 ```bash
- export NEO4J_PASSWORD='bloodhound' # Notice whitespace before 'export'
-python3 max.py {module} {args}
+git clone https://github.com/exploit-development/Max-BloodHound-CE.git
+cd Max-BloodHound-CE
+pip3 install -r requirements.txt
 
-```
-
-```
-python3 max.py -u neo4j -p neo4j {module} {args}
-```
-
-```
-python3 max.py {module} {args}
-Neo4j Username: neo4j
-Neo4j Password:
+export NEO4J_PASSWORD='your-neo4j-password'
+python3 max.py dpat -n customer.ntds -c hashcat.potfile
 ```
 
-### Quick Use
+The report generates and auto-opens in your browser as a single portable HTML file.
 
-Getting help in general, and module specific
-```
-python3 max.py -h
-python3 max.py {module} -h
-```
+---
 
-Importing owned objects into BH
-```
-python3 max.py mark-owned -f owned.txt
-python3 max.py mark-owned -f owned.txt --add-note "Owned by repeated local admin"
-```
+## Try With Sample Data
 
-Get list of users
-```
-python3 max.py get-info --users
-python3 max.py get-info --users --enabled
+Sample BloodHound data, NTDS, and potfile are all included. Follow these steps:
 
-USER01@DOMAIN.LOCAL
-USER02@DOMAIN.LOCAL
-...
+**Step 1 - Import the sample data into BloodHound CE:**
+
+In the BloodHound CE web UI, go to **Administration > File Ingest** and upload all JSON files from `sample_data/ad_sampledata/`. This loads three domains (`PHANTOM.CORP`, `GHOST.CORP`, `WRAITH.CORP`) into the graph.
+
+**Step 2 - Run the audit:**
+
+```bash
+export NEO4J_PASSWORD='your-neo4j-password'
+python3 max.py dpat -n sample_data/customer.ntds -c sample_data/hashcat.potfile
 ```
 
-Get list of objects in a target group
-```
-python3 max.py get-info --group-members "domain controllers@domain.local"
+The sample data includes 100 users and a populated potfile, enough to explore every section of the report.
+
+---
+
+## New Features
+
+### Enhanced DPAT Module
+
+| Feature | Description |
+|---------|-------------|
+| **Single-file HTML reports** | All CSS, JS, and icons embedded as base64 - one file, no dependencies |
+| **Summary statistics page** | At-a-glance dashboard with charts and privileged account exposure |
+| **Password reuse detection** | Shows all shared hashes, not just cracked passwords |
+| **Blank password detection** | Flags accounts with empty NT hash (`31d6cfe0d16ae931b73c59d7e0c089c0`) |
+| **LM hash cracking** | Improved LM hash parsing in potfiles |
+| **Highest risk weights for groups** | Scored by `cracked_users x percentage` to prevent small 100% groups from overshadowing large compromised ones |
+| **Group membership ranking** | Users ranked by total group count to surface over-privileged accounts |
+| **Interactive drill-down** | Click any stat, username, group, or chart to navigate |
+| **User detail pages** | Per-user view: groups, password info, and all accounts sharing the same hash |
+| **Built-in CSV export** | Export button on every table |
+| **Unsupported OS detection** | Flags end-of-life Windows with Windows 11 false-positive fix |
+
+### BloodHound CE Fixes
+
+| Fix | Description |
+|-----|-------------|
+| **Builtin Administrators group** | Fixed detection broken by the new collector's domain name appending |
+| **Windows 11 false positive** | Unsupported OS query no longer flags Windows 11 as end-of-life |
+
+---
+
+## Report Gallery
+
+<table>
+  <tr>
+    <td align="center"><img src="sample_data/screenshots/screenshot_1.png" width="420"/><br/><sub>Summary dashboard with privileged account exposure</sub></td>
+    <td align="center"><img src="sample_data/screenshots/screenshot_2.png" width="420"/><br/><sub>Password hashes with crack status and reuse count</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="sample_data/screenshots/screenshot_3.png" width="420"/><br/><sub>LM hashes (non-blank) detection</sub></td>
+    <td align="center"><img src="sample_data/screenshots/screenshot_4.png" width="420"/><br/><sub>User detail page - groups, hash, and password sharing</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="sample_data/screenshots/screenshot_5.png" width="420"/><br/><sub>Group membership ranking - spot over-privileged users</sub></td>
+    <td align="center"><img src="sample_data/screenshots/screenshot_6.png" width="420"/><br/><sub>Domain Admins with shared hash correlation</sub></td>
+  </tr>
+</table>
+
+---
+
+## Command Options
+
+```bash
+python3 max.py dpat -n <ntds_file> -c <potfile> [options]
 ```
 
-Get a list of computers that a user has administrative rights to
-```
-python3 max.py get-info --adminto USER01@DOMAIN.LOCAL
-```
+| Flag | Description |
+|------|-------------|
+| `-n, --ntds` | NTDS file (secretsdump format: `domain\user:RID:lm:nt:::`) |
+| `-c, --crackfile` | Potfile of cracked hashes (Hashcat/JTR format: `hash:password`) |
+| `-o, --output` | Output filename base (default: `report`) |
+| `-t, --threads` | Threads for parsing (default: 2) |
+| `-s, --sanitize` | Redact passwords and hashes in the report |
+| `-S, --store` | Keep parsed data in BloodHound after completion |
+| `--noparse` | Skip parsing - use data already stored in BloodHound |
+| `--clear` | Remove all NTDS/password data from BloodHound |
+| `--less` | Skip intensive queries (recommended for environments with more than 50k objects) |
+| `-p, --password` | Find all users with a specific password |
+| `-u, --username` | Look up the cracked password for a specific user |
+| `--own-cracked` | Mark all cracked users as Owned in BloodHound |
 
-Get a list of owned objects with the notes for each
-```
-python3 max.py get-info --owned --get-note
-```
+### Common Workflows
 
-Running a query - return a list of all users with a path to DA
-```
-python3 max.py query -q "MATCH (n:User),(m:Group {name:'DOMAIN ADMINS@DOMAIN.LOCAL'}) MATCH (n)-[*1..]->(m) RETURN DISTINCT(n.name)"
-```
-
-Delete an edge from the database
-```
-python3 max.py del-edge CanRDP
-```
-
-Add HasSPNConfigured relationship using the information stored within BloodHound, or with a GetUserSPNs impacket file
-```
-python3 max.py add-spns -b
-python3 max.py add-spns -i getuserspns-raw-output.txt
+**Large environments (more than 50k objects):**
+```bash
+python3 max.py dpat -n customer.ntds -c hashcat.potfile --less
 ```
 
-DPAT
-```
-python3 max.py dpat -n ~/client/ntds.dit -c ~/.hashcat/hashcat.potfile -o ouputdir --html --sanitize
-```
+**Parse once, query repeatedly:**
+```bash
+# First run - parse and store
+python3 max.py dpat -n customer.ntds -c hashcat.potfile --store
 
-Pet max
-```
-python3 max.py pet-max
-```
-
-#### Object Files & Specification
-
-Objects in file, must contain FQDN within, capitalization does not matter. This also applies to whenever a CLI username/computer name is supplied.
-
-```
-user01@domain.local      <- will be added / correct CLI input
-group01@domain.local     <- will be added / correct CLI input
-computer01.domain.local  <- will be added / correct CLI input
-ComPutEr01.doMAIn.LOcaL  <- will be added / correct CLI input
-user02                   <- will not be added / incorrect CLI input
-computer02               <- will not be added / incorrect CLI input
+# Subsequent runs - skip parsing
+python3 max.py dpat --noparse
 ```
 
-## Further work
+**Search for a specific password across all users:**
+```bash
+python3 max.py dpat --noparse -p "Summer2024!"
+```
 
-I hope to include an `analyze` function to provide some sort functionality similar to PlumHound/Cypheroth. Lastly, thinking about creating a Powershell version for those running Neo4j on Windows, but I'm trash at Powershell so TBD.
+**Sanitised report for sharing:**
+```bash
+python3 max.py dpat -n customer.ntds -c hashcat.potfile --sanitize
+```
 
-Any other features and improvements welcome, find me @knavesec in the BloodHoundGang Slack channel and on Twitter
+---
 
+## NTDS Extraction
 
-## Contributors
+**Step 1 - Dump from a Domain Controller (admin cmd):**
+```cmd
+ntdsutil "ac in ntds" "ifm" "cr fu c:\temp" q q
+```
 
-I'd like to especially thank those who have contributed their time to developing & improving this tool:
+**Step 2 - Extract with secretsdump:**
+```bash
+secretsdump.py -system registry/SYSTEM -ntds "Active Directory/ntds.dit" LOCAL -outputfile customer
+# On Kali: impacket-secretsdump
+```
 
-* [Nic Losby @blurbdust](https://twitter.com/blurbdust) (DPAT Module)
-* [Scott Brink @_sandw1ch](https://twitter.com/_sandw1ch) (Various)
-* [Logan @TheToddLuci0](https://infosec.exchange/@TheToddLuci0) (Many PRs)
+**Step 3 - Crack hashes with Hashcat:**
+```bash
+hashcat -m 1000 customer.ntds.ntds /path/to/wordlist -o hashcat.potfile
+```
+
+---
+
+## All Modules
+
+| Module | Description |
+|--------|-------------|
+| [dpat](wiki/dpat.md) | Domain Password Audit Tool - the main module |
+| [get-info](wiki/get-info.md) | Query BloodHound for users, groups, paths |
+| [mark-owned](wiki/mark-owned.md) | Mark objects as owned |
+| [mark-hvt](wiki/mark-hvt.md) | Mark high value targets |
+| [query](wiki/query.md) | Run custom Cypher queries |
+| [add-spns](wiki/add-spns.md) | Add SPN relationships |
+| [add-spw](wiki/add-spw.md) | Add "shares password with" relationships |
+| [del-edge](wiki/del-edge.md) | Delete edges from the graph |
+| [export](wiki/export.md) | Export BloodHound data |
+| [pet-max](wiki/pet-max.md) | Pet the good boy |
+
+---
+
+## Requirements
+
+- Python 3.6+
+- BloodHound Community Edition with Neo4j running
+- Neo4j accessible at `bolt://localhost:7687` (default)
+
+---
+
+## Credits
+
+| | |
+|---|---|
+| [clr2of8](https://github.com/clr2of8/DPAT) | Original DPAT concept and implementation |
+| [knavesec](https://github.com/knavesec/Max) | Max BloodHound toolkit |
+| [aidanstansfield](https://github.com/knavesec/Max/pull/23) | LM hash potfile improvements |
+| [exploit-development](https://github.com/exploit-development) | BloodHound CE port, Windows 2008 ADUC HTML report, and all enhancements |
+
+---
+
+<p align="center">
+  <a href="https://github.com/exploit-development/Max-BloodHound-CE/stargazers">⭐ Star this repo</a> •
+  <a href="https://github.com/exploit-development/Max-BloodHound-CE/issues">🐛 Report a bug</a> •
+  <a href="https://github.com/exploit-development/Max-BloodHound-CE/issues">💡 Request a feature</a>
+</p>

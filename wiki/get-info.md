@@ -9,7 +9,7 @@ There are a few things you can extract with this module:
 * Computer to computer administrator rights
 * ... and more!
 
-[Back to Max](https://github.com/knavesec/Max)
+[Back to Max-BloodHound-CE](../README.md) | [Original Max](https://github.com/knavesec/Max)
 
 
 #### Notes

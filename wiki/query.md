@@ -2,7 +2,7 @@
 
 For the advanced BloodHound user, experience with Cypher queries required. Allows for running raw Cypher queries and returning the output to the terminal
 
-[Back to Max](https://github.com/knavesec/Max)
+[Back to Max-BloodHound-CE](../README.md) | [Original Max](https://github.com/knavesec/Max)
 
 
 #### Notes

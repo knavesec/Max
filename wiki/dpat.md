@@ -1,119 +1,264 @@
 ## Module: dpat
 
-The Bloodhound Domain Password Audit Tool. Module to perform password analytics based off the BloodHound database, an NTDS.dit file, and a password cracking potfile (JTR/hashcat).
+The BloodHound Domain Password Audit Tool. Performs comprehensive password analytics using the BloodHound CE database, an NTDS.dit file, and a password cracking potfile (Hashcat/JTR).
 
-A few things that this module will look for:
-* Password length & reuse stats
-* Accounts with passwords that never expire cracked
-* Kerberoastable users cracked
-* High value domain group members cracked
-* Accounts with paths to unconstrained delegation objects cracked
+### Fork Attribution
+
+This module is based on:
+- **[DPAT](https://github.com/clr2of8/DPAT)** by clr2of8 - Original Domain Password Audit Tool
+- **[Max](https://github.com/knavesec/Max)** by knavesec - BloodHound extension toolkit
+
+### What This Module Analyzes
+
+* Password length distribution & statistics
+* Password reuse across ALL accounts (cracked and uncracked)
+* Blank password detection
+* Default AD complexity compliance
+* Accounts with passwords that never expire (cracked)
+* Kerberoastable users (cracked)
+* High value domain group members (cracked)
+* Domain Admins, Enterprise Admins, Builtin Administrators (cracked)
+* Accounts with paths to unconstrained delegation objects (cracked)
+* Accounts with paths to high value targets (cracked)
+* Unsupported/End-of-Life operating systems
+* Group membership ranking (users by number of groups)
 * ... and more!
 
-This module with full usage details was released in this blog post: [whynotsecurity.com/blog/max3](https://whynotsecurity.com/blog/max3/)
+### New Features in This Fork
 
-[Back to Max](https://github.com/knavesec/Max)
+#### Enhanced Password Analysis
+- **Password Reuse Detection** - Shows ALL shared password hashes, not just cracked passwords
+- **Blank Password Detection** - Identifies accounts with empty passwords (NT hash `31d6cfe0d16ae931b73c59d7e0c089c0`)
+- **LM Hash Support** - Improved LM hash cracking support in potfiles (credit: aidanstansfield)
+- **Default Complexity Check** - Shows if passwords meet the 3-of-4 AD complexity rule
+- **Weighted Risk Groups** - "Highest Risk Groups" uses weighted scoring (`cracked_users × percentage`) rather than just percentage. This ensures large compromised groups rank higher than tiny groups with 100% cracked
 
-#### Output Examples
+#### BloodHound CE Fixes
+- **Builtin Administrators Group** - Fixed detection with new collector's domain name appending
+- **Unsupported OS Detection** - Finds EOL Windows systems with Windows 11 false positive fix
 
-![HTML Output](https://github.com/knavesec/Max/blob/dpat/wiki/screenshots/dpat-htmloutput.png)
+#### New HTML Report
+A single-file, self-contained HTML report styled after Windows Server 2008 ADUC:
 
-![HTML Hashes](https://github.com/knavesec/Max/blob/dpat/wiki/screenshots/dpat-htmlhashes.png)
+- **Portable** - All assets embedded, no external files needed
+- **Interactive** - Clickable stats, charts, usernames, and groups
+- **User Details** - Click any user to see groups, password info, and password sharing
+- **Group Membership Ranking** - Users sorted by group count
+- **Search & Export** - Filter tables and export to CSV
+- **Browser Navigation** - Back/forward buttons work via URL hash
 
+[Back to Max-BloodHound-CE](../README.md) | [Original Max](https://github.com/knavesec/Max)
 
-#### Notes
+---
 
-* If you already have a parsed and cracked NTDS.dit file, you're ready for the tool. If you haven't, or don't know how to do such, see the "NTDS.dit Extraction & Parsing" section below.
-* If your AD environment contains a high level of objects (>50-75k), some of these queries may take a long time, consider using the `--less` flag to eliminate high-intensity queries
+### Quick Start
 
-* This function uploads usernames/hashes/passwords to the BloodHound database, then uses Cypher queries to perfom analytics. Afterwards it will cleanse the data
-* The `-c/--crackfile` is intended to be the input Hashcat/JTR potfile, or simply a file in the format `nt/lm hash:password`
-* The `--store` flag will make sure the parsed data stays in the database after completion, if the data is already stored then you can use the `--noparse` flag to skip the initial parsing and mapping phase
-* The `--clear` flag will remove all independently
-* The `--less` flag won't run intensive queries
-* The `--sanitize` flag will make sure all passwords and hashes are partially obfuscated
-* The `-o/--outputfile` will specify where the output file/s are written, for the `--html` flag the output will be a directory with all the files, for the `--csv` flag it will be a single filename
-* The `--threads` flag will increase the amount of threads used in NTDS & Potfile parsing, as well as mapping the users to the BloodHound database. It will not impact the queries/stats themselves
-* If you're looking for a specific user's password, you can search using the `-u/--username` flag and inputting the username in either BloodHound format (`user@domain.local`) or NTDS format (`domain.local/user`). This is best used with the `--noparse` option when things are already stored in the DB
-* If you're looking for all accounts using a certain password, you can search using the `-e/--password` flag and inputting the target password. Again, best used with the `--noparse` flag with info already stored
-* The `--own-cracked` flag will mark all cracked users as `Owned` in the Bloodhound database.
-* The `--add-crack-note` flag will add a note to cracked users indicating that their password has been cracked.
+```bash
+# Set Neo4j password
+export NEO4J_PASSWORD='your-password'
 
-
-#### NTDS.dit Extraction & Parsing
-
-This walkthrough is taken directly from the original DPAT tool, available here: [DPAT](https://github.com/clr2of8/DPAT)
-
-Your customer.ntds file should be in this format:
-> domain\username:RID:lmhash:nthash:::
-
-You can get this file by first dumping the password hashes from your domain controller by executing the following command in an administrative command prompt on a domain controller. Just make sure you have enough disk space to store the output in c:\\temp. The amount of space needed will be slightly larger than the size of the ntds.dit file that is currently on the disk, as this performs a backup of that file and some registry settings.
-
+# Generate report (auto-opens in browser)
+python3 max.py dpat -n customer.ntds -c hashcat.potfile
 ```
+
+That's it! The HTML report is generated automatically.
+
+---
+
+### Command Line Options
+
+| Flag | Description |
+|------|-------------|
+| `-n, --ntds` | NTDS file name (secretsdump format) |
+| `-c, --crackfile` | Potfile of cracked passwords (Hashcat/JTR format) |
+| `-o, --output` | Output base name for HTML report (default: report) |
+| `-t, --threads` | Number of threads for parsing (default: 2) |
+| `-s, --sanitize` | Partially redact passwords and hashes in report |
+| `-S, --store` | Keep parsed data in BloodHound database after completion |
+| `--noparse` | Skip parsing, use data already stored in BloodHound |
+| `--clear` | Remove all NTDS/password data from BloodHound database |
+| `--less` | Skip intensive queries (for large environments >50-75k objects) |
+| `-p, --password` | Search for all users with a specific password |
+| `-u, --username` | Look up password for a specific user |
+| `--own-cracked` | Mark all cracked users as "Owned" in BloodHound |
+| `--add-crack-note` | Add a note to cracked users |
+
+---
+
+### Output
+
+The tool generates a single HTML report (`report_YYYYMMDD_HHMM.html`) styled after Windows Server 2008 ADUC:
+
+- Full interactive drill-down capability
+- All raw data and statistics
+- Clickable usernames, groups, and charts
+- CSV export on every table
+- Contains everything needed (CSS, JS, icons embedded as base64)
+
+The report auto-opens in your browser.
+
+---
+
+### Notes
+
+* If you already have a parsed and cracked NTDS.dit file, you're ready for the tool. See "NTDS.dit Extraction & Parsing" below if needed.
+* For large AD environments (>50-75k objects), use the `--less` flag to skip intensive queries
+* The tool uploads data to BloodHound, runs queries, then cleanses the data (unless `--store` is used)
+* The `-c/--crackfile` expects Hashcat/JTR potfile format: `nthash:password` or `lmhash:password`
+* Use `--store` to keep data in the database, then `--noparse` on subsequent runs to skip parsing
+* Search for specific users (`-u`) or passwords (`-p`) works best with `--noparse` when data is already stored
+
+---
+
+### NTDS.dit Extraction & Parsing
+
+This walkthrough is from the original [DPAT](https://github.com/clr2of8/DPAT) tool.
+
+Your NTDS file should be in this format:
+```
+domain\username:RID:lmhash:nthash:::
+```
+
+#### Step 1: Dump from Domain Controller
+
+Execute in an administrative command prompt on a domain controller:
+
+```cmd
 ntdsutil "ac in ntds" "ifm" "cr fu c:\temp" q q
 ```
 
-The ntdsutil command will create the two files, `Active Directory\ntds.dit` and `registry\SYSTEM`, that are needed. You can then turn this output into the format expected by DPAT using [secretsdump.py](https://github.com/CoreSecurity/impacket/blob/master/examples/secretsdump.py). Secretsdump comes pre-installed on Kali Linux or can be easily installed on Windows using [these instructions](https://medium.com/@airman604/installing-impacket-on-windows-ded7ba8bec9a).
+This creates `Active Directory\ntds.dit` and `registry\SYSTEM`.
 
-```
+#### Step 2: Extract with secretsdump
+
+```bash
 secretsdump.py -system registry/SYSTEM -ntds "Active Directory/ntds.dit" LOCAL -outputfile customer
 ```
 
-If you would like to report on password history, include the `-history` flag as shown below. Note: Jan/2020 Josh Wright reported that the history hashes are not exported correctly on ntds.dit files from Win2K16 TP4 and later. See this [issue](https://github.com/SecureAuthCorp/impacket/issues/656).
-
-```
+For password history (note: may have issues on Win2K16 TP4+):
+```bash
 secretsdump.py -system registry/SYSTEM -ntds "Active Directory/ntds.dit" LOCAL -outputfile customer -history
 ```
 
-Note: Try using `impacket-secretsdump` instead of `secretsdump.py` on Kali Linux if secrectsdump.py can't be found.
+On Kali Linux, try `impacket-secretsdump` if `secretsdump.py` isn't found.
 
-The command above will create a file called "customer.ntds" which you will use with this tool (DPAT) as well as for password cracking. You can now proceed with your password cracking efforts to create a crack file in this format (which is the default output of the Hashcat tool):
+#### Step 3: Crack the Hashes
 
->nthash:password
-
-Or for LM Hashes:
->lmhashLeftOrRight:leftOrRightHalfPasswordUpcased
-
-The DPAT tool also supports output from John the Ripper (same format as hashcat.potfile but prepended with $NT$ or $LM$)
-
-
-#### Examples
-
+Use Hashcat or John the Ripper to crack the hashes. The potfile format should be:
 ```
-python3 max.py dpat -c ~/.hashcat/hashcat.potfile -n ./ntds.dit --sanitize
-
-<Function output>
-<Ascii password analysis output>
+nthash:password
 ```
 
+Or for LM hashes:
 ```
-python3 max.py dpat --noparse -o outputdir --html
-
-<Function output>
-<Html files written to outputdir/ >
+lmhash:PASSWORD
 ```
 
-```
-*after already having stored the hash information in BH
+---
 
+### Examples
+
+**Basic usage - generate HTML report:**
+```bash
+python3 max.py dpat -n customer.ntds -c hashcat.potfile
+```
+
+**Custom output name:**
+```bash
+python3 max.py dpat -n customer.ntds -c hashcat.potfile -o audit_results
+# Creates: audit_results_20240115_1430.html
+```
+
+**Sanitized report (redacted passwords/hashes):**
+```bash
+python3 max.py dpat -n customer.ntds -c hashcat.potfile --sanitize
+```
+
+**Large environment (skip intensive queries):**
+```bash
+python3 max.py dpat -n customer.ntds -c hashcat.potfile --less
+```
+
+**Store data for later analysis:**
+```bash
+# First run - parse and store
+python3 max.py dpat -n customer.ntds -c hashcat.potfile --store
+
+# Later runs - skip parsing
 python3 max.py dpat --noparse
-
-<Function output>
-<Ascii password analysis output>
 ```
 
-```
-python3 max.py dpat --noparse --password Fall2020
-
-[+] Searching for users with password Fall2020
-[+] Users: 1
-
-USER1@DOMAIN.LOCAL
+**Search for specific password:**
+```bash
+python3 max.py dpat --noparse -p "Summer2024!"
 ```
 
+**Look up user's password:**
+```bash
+python3 max.py dpat --noparse -u "admin@domain.local"
 ```
-python3 max.py dpat --noparse --username USER1@DOMAIN.LOCAL
 
-[+] Searching for password for user USER1@DOMAIN.LOCAL
-[+] Password for user USER1@DOMAIN.LOCAL: Fall2020
+**Mark cracked users as owned:**
+```bash
+python3 max.py dpat -n customer.ntds -c hashcat.potfile --own-cracked
 ```
+
+---
+
+### Report Sections
+
+The HTML report includes these sections:
+
+#### Overview
+- Summary statistics with clickable links to detail pages
+- Password length distribution chart
+- Password age distribution chart
+- Top groups by cracked percentage chart
+- Password complexity breakdown chart
+- Password reuse severity chart
+
+#### Password Stats
+- LM Hashes (Non-Blank)
+- Users with Username Matching Password
+- Password Length Stats
+- Password Complexity Stats
+- Password Reuse Stats (with drill-down to see all users per hash)
+
+#### All Groups
+- Groups ranked by cracked percentage
+- Click any group to see all members with their password status
+
+#### All Accounts
+- All User Accounts
+- All User Accounts Cracked
+- Enabled User Accounts Cracked
+
+#### Privileged Accounts
+- High Value User Accounts
+- Domain Admin Members
+- Enterprise Admin Members
+- Administrator Group Members
+- Group Membership Ranking (users by number of groups)
+
+#### Escalation Paths
+- Kerberoastable Users Cracked
+- Accounts Not Requiring Kerberos Pre-Authentication Cracked
+- Unconstrained Delegation Accounts Cracked
+- Inactive Accounts Cracked
+- Accounts With Passwords Set Over 1yr Ago Cracked
+- Accounts With Passwords That Never Expire Cracked
+- Various path-based attack vectors
+
+#### Infrastructure Risk
+- Unsupported Operating Systems (EOL Windows)
+
+#### User Details (click any username)
+- Enabled/Disabled status
+- Cracked status
+- Password length
+- Password (if cracked, with blank password indicator)
+- Default Complexity Met (Yes/No)
+- NT Hash
+- LM Hash (if non-blank)
+- Group Memberships (clickable)
+- Shares Password With (other users with same hash)

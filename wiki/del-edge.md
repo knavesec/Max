@@ -2,7 +2,7 @@
 
 Module for deleting an edge type from the database (warning: irreversible)
 
-[Back to Max](https://github.com/knavesec/Max)
+[Back to Max-BloodHound-CE](../README.md) | [Original Max](https://github.com/knavesec/Max)
 
 
 #### Notes
